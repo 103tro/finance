@@ -63,6 +63,9 @@ nav{display:flex;justify-content:center;border-bottom:1px solid var(--div)}
 .g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .cards2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:16px}
 .cards3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.bigrow{display:grid;gap:12px;margin-bottom:12px}
+.bigrow .sat .cl{font-size:10px}
+.bigrow .sat .cv{font-size:16px}
 .div{height:1px;background:var(--div);margin:14px 0}
 .mt{width:100%;border-collapse:collapse;font-size:13px}
 .mt th{color:var(--n700);font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--text);text-align:right}
@@ -165,8 +168,10 @@ input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px;cursor:point
   .fg input,.fg select{padding:9px 10px;font-size:14px}
   .btn{padding:9px 16px}
   .inv-acts{flex-wrap:wrap}
+  .bigrow{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+  .bigrow .big{grid-column:1/-1}
 }
-@media (max-width:400px){.cards3{grid-template-columns:1fr}.fg{grid-template-columns:1fr}}
+@media (max-width:400px){.cards3{grid-template-columns:1fr}.fg{grid-template-columns:1fr}.bigrow{grid-template-columns:1fr !important}}
 .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(32,31,29,.45);z-index:1000;align-items:center;justify-content:center;padding:16px}
 .modal-backdrop.open{display:flex}
 .modal-box{background:var(--bg);border-radius:4px;max-width:540px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 32px rgba(32,31,29,.22)}
@@ -793,6 +798,14 @@ function curBalDesc(desc,excludeIdxInDesc){
   let b=0;recs.forEach((r,i)=>{if(i===excludeIdxInDesc)return;b+=r.amount||0;});
   return b;
 }
+// One big stat box + N smaller "source" boxes beside it, laid out via inline grid-template-columns
+// so the count of satellites is free to grow (new income/invested source types) without CSS changes.
+function bigBoxRow(big,sats){
+  const bigHtml=`<div class="card big"><div class="cl">${big.cl}</div><div class="cv ${big.cvClass||''}" style="${big.cvStyle||''}">${big.cv}</div>${big.cs?`<div class="cs">${big.cs}</div>`:''}</div>`;
+  if(!sats.length)return`<div class="bigrow" style="grid-template-columns:1fr">${bigHtml}</div>`;
+  const satsHtml=sats.map(s=>`<div class="card sat"><div class="cl">${s.cl}</div><div class="cv ${s.cvClass||''}" style="${s.cvStyle||''}">${s.cv}</div></div>`).join('');
+  return`<div class="bigrow" style="grid-template-columns:1.6fr repeat(${sats.length},1fr)">${bigHtml}${satsHtml}</div>`;
+}
 
 function renderInvest(){
   let ey=-1,eri=-1; // eri = index within DB.investments (global) of record being edited, -1 = adding new
@@ -800,6 +813,7 @@ function renderInvest(){
   let selectedDescs=null; // null = all active descs selected by default
   let invMode='base'; // 'base' = convert all to base currency, 'native' = group by native currency
   let showArchived=false;
+  let startRateFetchDone=false; // guards the one-shot NBU historical-rate fetch for "Стартова сума" below
 
   function build(){
     const all=DB.investments||[];
@@ -876,16 +890,52 @@ function renderInvest(){
     const mixedNote=invMode==='native'&&!singleCur?`<div style="font-size:10px;color:#c28d41;margin-bottom:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Обрані категорії мають різні валюти (${curSet.join(', ')}) — показано в ${BS}. Зніміть зайві категорії щоб бачити в нативній валюті.</div>`:'';
 
     const firstRec=filtered.length>0?filtered[0]:null;
-    const startBoxHtml=firstRec?`<div style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:10px;padding:12px;margin-bottom:10px"><div style="font-size:10px;color:#605d5d;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Стартова сума</div><span style="font-size:15px;font-weight:300">${fmt(Math.abs(firstRec.amount))} ${getCur(firstRec.currency||'UAH').symbol}</span> <span style="font-size:11px;color:#605d5d">· ${firstRec.date&&firstRec.date.match(/^\d{4}/)?(new Date(firstRec.date+'T00:00:00')).toLocaleDateString('uk-UA'):firstRec.date} · ${firstRec.desc}</span></div>`:'';
-    const metricsHtml=`${selectedListNote}${mixedNote}${startBoxHtml}<div class="cards3" style="margin-bottom:8px">
-      <div class="card"><div class="cl">Вкладено</div><div class="cv" style="color:#4f6d8f">${setCalc.investedTotal?contDisp:'—'}</div><div class="cs">${setCalc.contGross?'зовні '+contGrossDisp:''}${setCalc.divReinv>0.01?' · реінвест. '+divReinvDisp:''}${Math.abs(setCalc.withdrawn)>0.01?' · переказано -'+withdrawnDisp:''}</div></div>
-      <div class="card"><div class="cl">Поточний баланс</div><div class="cv gold">${lastDisp}</div></div>
-      <div class="card"><div class="cl">Загальний прибуток</div><div class="cv ${profitVal>=0?'pos':'neg'}">${profitVal?(profitVal>=0?'+':'')+profitDisp:'—'}</div><div class="cs">${profitPct?(+profitPct>=0?'+':'')+profitPct+'% за '+weightedYears.toFixed(1)+' р.'+(annualPct?' · ≈'+annualPct+'% річних':''):''}</div></div>
-    </div>
-    <div class="cards2" style="margin-bottom:12px">
-      <div class="card"><div class="cl">з них Дивіденди/Купони <span style="color:#7d7979;font-weight:400">(реалізовано)</span></div><div class="cv pos">${divBase?'+'+divDisp:'—'}</div><div class="cs">${divPct?divPct+'% — реальні гроші':''}</div></div>
-      <div class="card"><div class="cl">з них Капіталізація <span style="color:#7d7979;font-weight:400">(нереалізовано)</span></div><div class="cv ${capBase>=0?'':'neg'}" style="${capBase?'':'color:#605d5d'}">${filtered.some(r=>r.type==='appreciation')?(capBase>=0?'+':'')+capDisp:'немає записів'}</div><div class="cs">${capPct&&filtered.some(r=>r.type==='appreciation')?capPct+'%':''}</div></div>
-    </div>${notReinvBase>0.01?`<div class="cards3" style="margin-bottom:12px"><div class="card"><div class="cl">Виведено / не реінвестовано <span style="color:#7d7979;font-weight:400">(в прибутку, не в балансі)</span></div><div class="cv" style="color:#6f7a8c">${notReinvDisp}</div></div></div>`:''}`;
+
+    // "Стартова сума" shows its native-currency amount plus the UAH value at the historical rate
+    // on the investment date (not today's rate) — reuses the same NBU rate cache as Overview's
+    // $-mode. Only USD has a historical source right now; fetched once per tab visit, not retried.
+    let startUahVal=null,startUahLoading=false;
+    if(firstRec){
+      const scur=firstRec.currency||'UAH';
+      if(scur!==getBase()&&scur==='USD'&&firstRec.date&&/^\d{4}-\d{2}-\d{2}$/.test(firstRec.date)){
+        const d=new Date(firstRec.date+'T00:00:00');
+        const today=new Date();today.setHours(0,0,0,0);
+        const safeD=d>today?today:d;
+        const rate=DB.historicalRates[dKey(safeD)];
+        if(rate)startUahVal=Math.abs(firstRec.amount)*rate;
+        else if(!startRateFetchDone){
+          startRateFetchDone=true;startUahLoading=true;
+          ensureHistoricalRates([safeD]).then(()=>build());
+        }
+      }
+    }
+    const firstRecDateStr=firstRec&&firstRec.date&&firstRec.date.match(/^\d{4}/)?(new Date(firstRec.date+'T00:00:00')).toLocaleDateString('uk-UA'):(firstRec?firstRec.date:'');
+    const startBoxHtml=firstRec?`<div class="card"><div class="cl">Стартова сума</div><div style="font-size:15px;font-weight:300">${fmt(Math.abs(firstRec.amount))} ${getCur(firstRec.currency||'UAH').symbol}</div>${startUahVal!=null?`<div class="cs">≈ ${fmt(Math.round(startUahVal))} ₴ <span style="color:var(--n400)">курс на дату</span></div>`:startUahLoading?`<div class="cs">курс завантажується…</div>`:''}<div class="cs" style="margin-top:2px">${firstRecDateStr} · ${firstRec.desc}</div></div>`:'';
+    const balanceBoxHtml=`<div class="card"><div class="cl">Поточний баланс</div><div class="cv gold">${lastDisp}</div></div>`;
+    const row1Html=firstRec?`<div class="bigrow" style="grid-template-columns:1fr 1.8fr">${startBoxHtml}${balanceBoxHtml}</div>`:`<div class="bigrow" style="grid-template-columns:1fr">${balanceBoxHtml}</div>`;
+
+    const vkladenoSats=[];
+    if(setCalc.contGross)vkladenoSats.push({cl:'Зовні',cv:contGrossDisp});
+    if(setCalc.divReinv>0.01)vkladenoSats.push({cl:'Реінвестовано',cv:divReinvDisp});
+    const row2Html=bigBoxRow({cl:'Вкладено',cv:setCalc.investedTotal?contDisp:'—',cvStyle:'color:#4f6d8f'},vkladenoSats);
+
+    const row3Html=bigBoxRow(
+      {cl:'Загальний прибуток',cv:profitVal?(profitVal>=0?'+':'')+profitDisp:'—',cvClass:profitVal>=0?'pos':'neg',cs:profitPct?(+profitPct>=0?'+':'')+profitPct+'% за '+weightedYears.toFixed(1)+' р.'+(annualPct?' · ≈'+annualPct+'% річних':''):''},
+      [
+        {cl:'Дивіденди/Купони',cv:divBase?'+'+divDisp:'—',cvClass:'pos'},
+        {cl:'Капіталізація',cv:filtered.some(r=>r.type==='appreciation')?(capBase>=0?'+':'')+capDisp:'немає записів',cvClass:capBase>=0?'':'neg',cvStyle:capBase?'':'color:var(--n700)'}
+      ]
+    );
+
+    // "Виведено" combines real withdrawal transactions (net of internal transfers) with dividends
+    // paid out rather than reinvested — both are money that left the compounding balance.
+    const withdrawnRaw=invMode==='native'&&natCalc?Math.abs(natCalc.withdrawn):Math.abs(setCalc.withdrawn);
+    const notReinvRaw=invMode==='native'&&singleCur?notReinvNat:notReinvBase;
+    const totalOutRaw=withdrawnRaw+notReinvRaw;
+    const totalOutDisp=fmtM(totalOutRaw,totalOutRaw,singleCur);
+    const row4Html=totalOutRaw>0.01?bigBoxRow({cl:'Виведено',cv:totalOutDisp,cvStyle:'color:#6f7a8c'},[]):'';
+
+    const metricsHtml=`${selectedListNote}${mixedNote}${row1Html}${row2Html}${row3Html}${row4Html}`;
 
     const filterPillsHtml=visibleDescs.map(d=>{
       const isArch=archived.includes(d);
