@@ -481,7 +481,7 @@ function renderOverview(){
         +card('Витрати',money(cE),'',hasPrev?pct(cE,pE)+' до '+(y-1)+' ('+fmt(pE)+')':first,spark(mE),'#b68235')
         +card('Баланс',smoney(bal),bal<0?'neg':'',hasPrev?(bal-pB>=0?'+':'−')+fmt(Math.abs(bal-pB))+' до '+(y-1)+' ('+smoney(pB)+')':first,spark(mB),'#7d5411')
         +'</div><div class="ktiles">'
-        +tile('Накопичено',smoney(cum),cum<0?'neg':'','2018 — '+y)
+        +tile('Накопичено',smoney(cum),cum<0?'neg':'',years[0]+' — '+y)
         +tile('Баланс за місяць',smoney(avg),avg<0?'neg':'','у середньому, '+y)
         +tile('Збережено від доходів',(rt<0?'−':'')+Math.abs(rt).toFixed(0)+'%',rt<0?'neg':'','баланс до доходів, '+y)
         +'</div>';
@@ -900,7 +900,7 @@ function renderInvest(){
       <div class="chart-scroll"><div style="position:relative;height:200px;min-width:${Math.max(420,filtered.length*55)}px"><canvas id="civchart"></canvas></div></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-      <button class="cbtn" id="btn-toggle-recs" style="margin-bottom:0">▼ Всі записи <span style="font-size:10px;color:#605d5d">(${filtered.length})</span></button>
+      <button class="cbtn" id="btn-toggle-recs" style="margin-bottom:0">▼ Записи <span style="font-size:10px;color:#605d5d">(${filtered.length})</span></button>
       <button class="btn btng" id="btn-open-import" style="font-size:11px;padding:6px 12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Імпорт з Excel</button>
       <button class="btn btng" id="btn-open-transfer" style="font-size:11px;padding:6px 12px">↔ Переказ</button>
     </div>
@@ -1039,7 +1039,7 @@ function renderInvest(){
     // ── records collapse + edit/delete ──
     const toggleBtn=document.getElementById('btn-toggle-recs');
     const recsWrap=document.getElementById('recs-wrap');
-    if(toggleBtn&&recsWrap){toggleBtn.onclick=()=>{const op=recsWrap.style.display==='none';recsWrap.style.display=op?'block':'none';toggleBtn.innerHTML=(op?'▲':'▼')+' Всі записи <span style="font-size:10px;color:#605d5d">('+filtered.length+')</span>';};}
+    if(toggleBtn&&recsWrap){toggleBtn.onclick=()=>{const op=recsWrap.style.display==='none';recsWrap.style.display=op?'block':'none';toggleBtn.innerHTML=(op?'▲':'▼')+' Записи <span style="font-size:10px;color:#605d5d">('+filtered.length+')</span>';};}
     // ── Transfer between categories ──
     const openTransferBtn=document.getElementById('btn-open-transfer');
     const transferForm=document.getElementById('transfer-form');
@@ -1464,10 +1464,13 @@ function renderAnalysis(){
   const incVolatilityPct=avgInc>0?(incVolatility/avgInc*100):0;
 
   // Year-over-year trend: average % change in yearly income across consecutive full years
+  // Only compare full (12-month) years — a partial current year understates/overstates
+  // the change versus a complete prior year.
+  const isFullYear=y=>DB.monthly[y].inc.filter(v=>v!=null).length>=12;
   let yoyChanges=[];
   for(let i=1;i<yearTotals.length;i++){
     const prev=yearTotals[i-1].inc,cur=yearTotals[i].inc;
-    if(prev>0)yoyChanges.push((cur-prev)/prev*100);
+    if(prev>0&&isFullYear(yearTotals[i-1].year)&&isFullYear(yearTotals[i].year))yoyChanges.push((cur-prev)/prev*100);
   }
   const avgYoy=yoyChanges.length?yoyChanges.reduce((a,v)=>a+v,0)/yoyChanges.length:null;
 
@@ -1529,8 +1532,8 @@ function renderSettings(){
   <div class="cc"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
     <div><div class="cl">Місяців</div><div class="cv">${mc}</div></div>
     <div><div class="cl">Знімків</div><div class="cv">${DB.portfolio.length}</div></div>
-    <div><div class="cl">Записів IBKR</div><div class="cv">${(DB.ibkr_history||[]).length}</div></div>
-    <div><div class="cl">Записів ОВДП</div><div class="cv">${(DB.ovdp_history||[]).length}</div></div>
+    <div><div class="cl">Записів інвестицій</div><div class="cv">${(DB.investments||[]).length}</div></div>
+    <div><div class="cl">Інструментів</div><div class="cv">${activeDescs().length}</div></div>
     <div><div class="cl">Інвестицій (років)</div><div class="cv">${new Set((DB.investments||[]).map(r=>(r.date||'').slice(0,4)).filter(y=>y)).size}</div></div>
     <div><div class="cl">Остання копія</div><div style="font-size:12px;color:#605d5d;margin-top:4px">${le}</div></div>
   </div></div>
