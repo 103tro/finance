@@ -142,7 +142,7 @@ input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px;cursor:point
 .split>.fc{margin-bottom:0}
 .g2>.fc{margin-bottom:0;display:flex;flex-direction:column}
 .g2>.fc>p{min-height:3em}
-.actbox,.drop{margin-top:auto;margin-bottom:0;border:1px dashed var(--n400);border-radius:4px;padding:16px 14px;text-align:center}
+.actbox,.drop{margin-top:auto;margin-bottom:0;border:1px dashed var(--n400);border-radius:4px;padding:16px 14px;text-align:center;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
 .actbox{border-style:solid;border-color:var(--div)}
 .actnote{font-size:12px;color:var(--n700);margin-top:8px;min-height:1.5em}
 .fc.danger{border-color:#b3261e}
@@ -1599,11 +1599,12 @@ function renderSettings(){
     <div class="drop" id="drp">
       <input type="file" id="finp" accept=".json">
       <button class="btn btnp" type="button" style="pointer-events:none">Вибрати файл</button>
+      <div class="actnote">або перетягни .json сюди</div>
     </div>
   </div>
   <div class="g2">
     <div class="actnote" id="ets"></div>
-    <div><div class="actnote">або перетягни .json сюди</div><div class="sbox" id="ist"></div></div>
+    <div class="sbox" id="ist"></div>
   </div>
   <div class="st danger">Небезпечна зона</div>
   <div class="fc danger">
