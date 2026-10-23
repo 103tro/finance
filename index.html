@@ -282,6 +282,19 @@ function fmtRecDate(s){
   return s||'';
 }
 function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+// Elapsed time from an ISO date to today, as "2 р. 5 міс." — recalculated from the date itself,
+// never hardcoded, so editing the date updates this everywhere it's shown.
+function elapsedYM(dateStr){
+  if(!dateStr||!/^\d{4}-\d{2}-\d{2}$/.test(dateStr))return'';
+  const d=new Date(dateStr+'T00:00:00');
+  const today=new Date();today.setHours(0,0,0,0);
+  if(d>today)return'';
+  let y=today.getFullYear()-d.getFullYear(),m=today.getMonth()-d.getMonth();
+  if(today.getDate()<d.getDate())m--;
+  if(m<0){y--;m+=12;}
+  if(y<=0&&m<=0)return'<1 міс.';
+  return[y>0?y+' р.':'',m>0?m+' міс.':''].filter(Boolean).join(' ');
+}
 function monthStrToISO(s){
   if(!s)return todayISO();
   if(s instanceof Date&&!isNaN(s)){const y=s.getFullYear(),m=String(s.getMonth()+1).padStart(2,'0'),d=String(s.getDate()).padStart(2,'0');return y+'-'+m+'-'+d;}
@@ -910,7 +923,8 @@ function renderInvest(){
       }
     }
     const firstRecDateStr=firstRec&&firstRec.date&&firstRec.date.match(/^\d{4}/)?(new Date(firstRec.date+'T00:00:00')).toLocaleDateString('uk-UA'):(firstRec?firstRec.date:'');
-    const startBoxHtml=firstRec?`<div class="card"><div class="cl">Стартова сума</div><div style="font-size:15px;font-weight:300">${fmt(Math.abs(firstRec.amount))} ${getCur(firstRec.currency||'UAH').symbol}</div>${startUahVal!=null?`<div class="cs">≈ ${fmt(Math.round(startUahVal))} ₴</div>`:startUahLoading?`<div class="cs">курс завантажується…</div>`:''}<div class="cs" style="margin-top:2px">${firstRecDateStr} · ${firstRec.desc}</div></div>`:'';
+    const firstRecElapsed=firstRec?elapsedYM(firstRec.date):'';
+    const startBoxHtml=firstRec?`<div class="card"><div class="cl">Стартова сума</div><div style="font-size:15px;font-weight:300">${fmt(Math.abs(firstRec.amount))} ${getCur(firstRec.currency||'UAH').symbol}</div>${startUahVal!=null?`<div class="cs">≈ ${fmt(Math.round(startUahVal))} ₴</div>`:startUahLoading?`<div class="cs">курс завантажується…</div>`:''}<div class="cs" style="margin-top:2px">${firstRecDateStr} · ${firstRec.desc}${firstRecElapsed?' · '+firstRecElapsed:''}</div></div>`:'';
     const balanceBoxHtml=`<div class="card"><div class="cl">Поточний баланс</div><div class="cv gold">${lastDisp}</div></div>`;
     const row1Html=firstRec?`<div class="bigrow" style="grid-template-columns:1fr 1.8fr">${startBoxHtml}${balanceBoxHtml}</div>`:`<div class="bigrow" style="grid-template-columns:1fr">${balanceBoxHtml}</div>`;
 
