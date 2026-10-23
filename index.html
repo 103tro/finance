@@ -910,7 +910,7 @@ function renderInvest(){
       }
     }
     const firstRecDateStr=firstRec&&firstRec.date&&firstRec.date.match(/^\d{4}/)?(new Date(firstRec.date+'T00:00:00')).toLocaleDateString('uk-UA'):(firstRec?firstRec.date:'');
-    const startBoxHtml=firstRec?`<div class="card"><div class="cl">Стартова сума</div><div style="font-size:15px;font-weight:300">${fmt(Math.abs(firstRec.amount))} ${getCur(firstRec.currency||'UAH').symbol}</div>${startUahVal!=null?`<div class="cs">≈ ${fmt(Math.round(startUahVal))} ₴ <span style="color:var(--n400)">курс на дату</span></div>`:startUahLoading?`<div class="cs">курс завантажується…</div>`:''}<div class="cs" style="margin-top:2px">${firstRecDateStr} · ${firstRec.desc}</div></div>`:'';
+    const startBoxHtml=firstRec?`<div class="card"><div class="cl">Стартова сума</div><div style="font-size:15px;font-weight:300">${fmt(Math.abs(firstRec.amount))} ${getCur(firstRec.currency||'UAH').symbol}</div>${startUahVal!=null?`<div class="cs">≈ ${fmt(Math.round(startUahVal))} ₴</div>`:startUahLoading?`<div class="cs">курс завантажується…</div>`:''}<div class="cs" style="margin-top:2px">${firstRecDateStr} · ${firstRec.desc}</div></div>`:'';
     const balanceBoxHtml=`<div class="card"><div class="cl">Поточний баланс</div><div class="cv gold">${lastDisp}</div></div>`;
     const row1Html=firstRec?`<div class="bigrow" style="grid-template-columns:1fr 1.8fr">${startBoxHtml}${balanceBoxHtml}</div>`:`<div class="bigrow" style="grid-template-columns:1fr">${balanceBoxHtml}</div>`;
 
