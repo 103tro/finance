@@ -767,7 +767,17 @@ function activeDescs(){return allDescs().filter(d=>!(DB.investArchived||[]).incl
 function archivedDescs(){return allDescs().filter(d=>(DB.investArchived||[]).includes(d));}
 function rememberDesc(d){if(!DB.investDescs)DB.investDescs=[];if(d&&!DB.investDescs.includes(d))DB.investDescs.push(d);}
 function recsForDesc(desc){return(DB.investments||[]).filter(r=>r.desc===desc);}
+// A transfer between two tracked instruments (both legs share transferId) only shows up as
+// "contributed" or "withdrawn" money if just one leg is in view — if both legs are present
+// (e.g. viewing all instruments together), the money never left the tracked total, so drop
+// both legs before summing or it inflates "Вкладено" by the transferred amount.
+function excludeInternalTransfers(recs){
+  const legCount={};
+  recs.forEach(r=>{if(r.transferId)legCount[r.transferId]=(legCount[r.transferId]||0)+1;});
+  return recs.filter(r=>!(r.transferId&&legCount[r.transferId]>=2));
+}
 function calcSet(recs){
+  recs=excludeInternalTransfers(recs);
   let contGross=0,withdrawn=0,div=0,divNotReinv=0,cap=0;
   recs.forEach(r=>{const amt=toBase(r.amount||0,r.currency||'UAH');if(r.type==='contribution')contGross+=amt;else if(r.type==='withdrawal')withdrawn+=amt;else if(r.type==='dividends'){div+=amt;if(r.reinvested===false)divNotReinv+=amt;}else cap+=amt;});
   const cont=contGross+withdrawn; // net working capital (withdrawn already negative)
@@ -809,7 +819,7 @@ function renderInvest(){
     // native-currency totals (only meaningful if singleCur; otherwise per-currency breakdown)
     function calcNative(recs,curCode){
       let contGross=0,withdrawn=0,div=0,divNotReinv=0,cap=0;
-      recs.filter(r=>(r.currency||'UAH')===curCode).forEach(r=>{const amt=r.amount||0;if(r.type==='contribution')contGross+=amt;else if(r.type==='withdrawal')withdrawn+=amt;else if(r.type==='dividends'){div+=amt;if(r.reinvested===false)divNotReinv+=amt;}else cap+=amt;});
+      excludeInternalTransfers(recs).filter(r=>(r.currency||'UAH')===curCode).forEach(r=>{const amt=r.amount||0;if(r.type==='contribution')contGross+=amt;else if(r.type==='withdrawal')withdrawn+=amt;else if(r.type==='dividends'){div+=amt;if(r.reinvested===false)divNotReinv+=amt;}else cap+=amt;});
       const cont=contGross+withdrawn;
       const divReinv=div-divNotReinv;
       const investedTotal=contGross+divReinv;
