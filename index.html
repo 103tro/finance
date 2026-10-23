@@ -1590,22 +1590,20 @@ function renderSettings(){
   </div>
   </div>
   <div class="st">Резервна копія</div>
-  <div class="g2">
-  <div class="fc">
-    <div class="ct">Зберегти</div>
-    <p style="font-size:13px;color:#605d5d;margin-bottom:12px">Збережіть усі дані як JSON-файл собі на пристрій.</p>
-    <div class="actbox"><button class="btn btnp" id="bexp">Зберегти резервну копію</button><div class="actnote" id="ets"></div></div>
+  <div class="g2" style="margin-bottom:10px">
+    <div><div class="ct" style="margin-bottom:6px">Зберегти</div><p style="font-size:13px;color:#605d5d">Збережіть усі дані як JSON-файл собі на пристрій.</p></div>
+    <div><div class="ct" style="margin-bottom:6px">Відновити з файлу</div><p style="font-size:13px;color:#605d5d">Виберіть раніше збережений JSON-файл. Поточні дані будуть замінені.</p></div>
   </div>
-  <div class="fc">
-    <div class="ct">Відновити з файлу</div>
-    <p style="font-size:13px;color:#605d5d;margin-bottom:12px">Виберіть раніше збережений JSON-файл. Поточні дані будуть замінені.</p>
+  <div class="g2" style="margin-bottom:10px">
+    <div class="actbox"><button class="btn btnp" id="bexp">Зберегти резервну копію</button></div>
     <div class="drop" id="drp">
       <input type="file" id="finp" accept=".json">
       <button class="btn btnp" type="button" style="pointer-events:none">Вибрати файл</button>
-      <div class="actnote">або перетягни .json сюди</div>
     </div>
-    <div class="sbox" id="ist"></div>
   </div>
+  <div class="g2">
+    <div class="actnote" id="ets"></div>
+    <div><div class="actnote">або перетягни .json сюди</div><div class="sbox" id="ist"></div></div>
   </div>
   <div class="st danger">Небезпечна зона</div>
   <div class="fc danger">
