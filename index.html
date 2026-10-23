@@ -1531,7 +1531,7 @@ function renderSettings(){
     <div><div class="cl">Знімків</div><div class="cv">${DB.portfolio.length}</div></div>
     <div><div class="cl">Записів IBKR</div><div class="cv">${(DB.ibkr_history||[]).length}</div></div>
     <div><div class="cl">Записів ОВДП</div><div class="cv">${(DB.ovdp_history||[]).length}</div></div>
-    <div><div class="cl">Інвестицій (років)</div><div class="cv">${DB.investManual.length}</div></div>
+    <div><div class="cl">Інвестицій (років)</div><div class="cv">${new Set((DB.investments||[]).map(r=>(r.date||'').slice(0,4)).filter(y=>y)).size}</div></div>
     <div><div class="cl">Остання копія</div><div style="font-size:12px;color:#605d5d;margin-top:4px">${le}</div></div>
   </div></div>
   <div class="st">Валюти та курси</div>
