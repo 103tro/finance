@@ -384,31 +384,6 @@ function load(){
 }
 function dc(id){if(CH[id]){CH[id].destroy();delete CH[id];}}
 function mk(id,cfg){dc(id);const c=document.getElementById(id);if(c)CH[id]=new Chart(c,cfg);}
-// For a 2-line chart with always-on datalabels: decide per point whether a label sits
-// above or below its own point, and how far, based on (a) how close the two series are
-// at that point — push harder apart when they're near-equal — and (b) how much room is
-// actually left before the chart area's edge, flipping/clamping rather than overflowing
-// into the axis ticks. `prefer` is the dataset's default side ('top' or 'bottom').
-function edgeAwareLabel(ctx,prefer){
-  const area=ctx.chart.chartArea,scale=ctx.chart.scales.y;if(!area||!scale)return{align:prefer,offset:6};
-  // Read both series' pixel position straight from the scale (value->pixel), not from the other
-  // dataset's rendered point element — that element may not have its geometry computed yet when
-  // this callback runs for an earlier dataset, silently breaking the gap math (NaN) otherwise.
-  const i=ctx.dataIndex,otherIdx=ctx.datasetIndex===0?1:0;
-  const v0=ctx.dataset.data[i],otherDs=ctx.chart.data.datasets[otherIdx],v1=otherDs?otherDs.data[i]:null;
-  if(v0==null)return{align:prefer,offset:6};
-  const y0=scale.getPixelForValue(v0),y1=v1!=null?scale.getPixelForValue(v1):null;
-  const gap=y1!=null?Math.abs(y0-y1):999;
-  let want=gap<40?Math.round(18-gap*0.3):6;want=Math.max(6,Math.min(18,want));
-  const roomTop=y0-area.top-3,roomBottom=area.bottom-y0-3;
-  let align=prefer,offset=want;
-  if(align==='top'){
-    if(offset>roomTop){if(roomBottom>roomTop+8){align='bottom';offset=Math.min(want,Math.max(2,roomBottom));}else offset=Math.max(2,roomTop);}
-  }else{
-    if(offset>roomBottom){if(roomTop>roomBottom+8){align='top';offset=Math.min(want,Math.max(2,roomTop));}else offset=Math.max(2,roomBottom);}
-  }
-  return{align,offset};
-}
 function setSubnav(html){const sn=document.getElementById('subnav'),sni=document.getElementById('subnav-inner');if(sni)sni.innerHTML=html;if(sn)sn.hidden=false;}
 function clearSubnav(){const sn=document.getElementById('subnav'),sni=document.getElementById('subnav-inner');if(sni)sni.innerHTML='';if(sn)sn.hidden=true;}
 const fmt=n=>Math.round(n).toLocaleString('uk-UA');
@@ -569,7 +544,7 @@ function renderCurrentYear(){
     const mbArr=M.map((_,i)=>(d.inc[i]==null&&d.exp[i]==null)?null:(d.inc[i]||0)-(d.exp[i]||0));
     document.getElementById('cy-body').innerHTML=`
     <div class="cards2"><div class="card"><div class="cl">${lM>=0?M[lM]+' — баланс':'Немає даних'}</div><div class="cv ${(lI-lE)>=0?'pos':'neg'}">${sgn(lI-lE)}${fmt(lI-lE)} грн</div><div class="cs">дох. ${fmt(lI)} · вит. ${fmt(lE)}</div></div><div class="card"><div class="cl">Доходи за рік</div><div class="cv gold">${fmt(t.inc)} грн</div></div><div class="card"><div class="cl">Баланс за рік</div><div class="cv ${t.bal>=0?'pos':'neg'}">${sgn(t.bal)}${fmt(t.bal)} грн</div></div><div class="card"><div class="cl">Витрати за рік</div><div class="cv" style="color:#7d5411">${fmt(t.exp)} грн</div></div></div>
-    <div class="cc"><div class="ct">Доходи та витрати — ${selY}<div style="display:flex;gap:10px"><span class="li"><span style="width:14px;height:2px;background:#3f7a5c;display:inline-block"></span>Доходи</span><span class="li"><span style="width:14px;height:2px;background:#7d5411;display:inline-block"></span>Витрати</span></div></div><div class="chart-scroll"><div style="position:relative;height:200px;min-width:420px"><canvas id="ccy"></canvas></div></div></div>
+    <div class="cc"><div class="ct">Доходи та витрати — ${selY}</div><div class="chart-scroll"><div style="position:relative;height:200px;min-width:420px"><canvas id="ccy"></canvas></div></div><div class="lr"><span class="li"><span style="width:12px;height:12px;background:rgba(68,65,65,.85);border-radius:2px;display:inline-block"></span>Доходи</span><span class="li"><span style="width:12px;height:12px;background:rgba(194,141,65,.85);border-radius:2px;display:inline-block"></span>Витрати</span></div></div>
     <div class="cc"><div class="ct">Баланс по місяцях — ${selY}</div><div class="chart-scroll"><div style="position:relative;height:180px;min-width:420px"><canvas id="ccyb"></canvas></div></div></div>
     <button class="cbtn" id="btbl"><span>${tOpen?'▲':'▼'} Місячна таблиця — ${selY}</span><span style="font-size:10px;color:#605d5d">${fc} з 12 місяців</span></button>
     <div id="cyw" style="display:${tOpen?'block':'none'};margin-bottom:12px"><div class="cc" style="padding:12px"><table class="mt"><thead><tr><th>Місяць</th><th>Доходи</th><th>Витрати</th><th>Баланс</th><th></th></tr></thead><tbody id="ctb"></tbody></table></div></div>
@@ -585,7 +560,13 @@ function renderCurrentYear(){
     <div class="fg"><div><label>Рік</label><input id="fy" type="number" value="${selY}"></div><div><label>Місяць</label><select id="fm">${M.map((m,i)=>`<option value="${i}">${m}</option>`).join('')}</select></div><div><label>Доходи грн</label><input id="fi" type="number" placeholder="0"></div><div><label>Витрати грн</label><input id="fe" type="number" placeholder="0"></div></div>
     <div class="btnr-wrap"><button class="btn btnp" id="bsv">Зберегти</button><button class="btn btng" id="bcl">Очистити</button><button class="btn btnr2" id="bdl" style="display:none">Видалити місяць</button></div>
     <div class="hint">Розгорни таблицю і натисни на рядок, щоб редагувати</div></div>`;
-    mk('ccy',{type:'line',data:{labels:M,datasets:[{label:'Доходи',data:d.inc,borderColor:'#3f7a5c',backgroundColor:'rgba(68,65,65,.05)',fill:true,borderWidth:2,pointRadius:4,tension:.35,spanGaps:false,datalabels:{align:ctx=>edgeAwareLabel(ctx,'top').align,offset:ctx=>edgeAwareLabel(ctx,'top').offset,color:'#3f7a5c'}},{label:'Витрати',data:d.exp,borderColor:'#7d5411',backgroundColor:'rgba(194,141,65,.06)',fill:true,borderWidth:2,pointRadius:4,tension:.35,spanGaps:false,borderDash:[5,3],datalabels:{align:ctx=>edgeAwareLabel(ctx,'bottom').align,offset:ctx=>edgeAwareLabel(ctx,'bottom').offset,color:'#7d5411'}}]},options:{...CD,layout:{padding:{top:24,bottom:20}},interaction:{mode:'index',intersect:false},plugins:{...CD.plugins,datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,formatter:v=>v>=1000?(v/1000).toFixed(0)+'k':'',font:{size:9,weight:'500'}}},scales:{...CD.scales,y:{...CD.scales.y,grace:'15%'}}}});
+    mk('ccy',{type:'bar',data:{labels:M,datasets:[
+      {label:'Доходи',data:d.inc,backgroundColor:'rgba(68,65,65,.85)',borderRadius:4,barPercentage:.6},
+      {label:'Витрати',data:d.exp,backgroundColor:'rgba(194,141,65,.85)',borderRadius:4,barPercentage:.6}
+    ]},options:{...CD,interaction:{mode:'index',intersect:false},layout:{padding:{top:22}},plugins:{...CD.plugins,
+      tooltip:{...CD.plugins.tooltip,callbacks:{label:ctx=>ctx.raw!=null?` ${ctx.dataset.label}: ${fmt(ctx.raw)} ${BS}`:' —'}},
+      datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,anchor:'end',align:'end',offset:-2,formatter:v=>v>=1000?(v/1000).toFixed(0)+'k':fmt(v),font:{size:9,weight:'500'},color:ctx=>ctx.datasetIndex===0?'#201f1d':'#7d5411'}
+    },scales:{x:{grid:{display:false},ticks:{color:'#7d7979',font:{size:10},maxRotation:0}},y:{grace:'20%',grid:{color:'#eae7e7'},ticks:{color:'#7d7979',font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
     mk('ccyb',{type:'bar',data:{labels:M,datasets:[{label:'Баланс',data:mbArr,backgroundColor:mbArr.map(b=>b==null?'transparent':b>=0?'rgba(68,65,65,.85)':'rgba(194,141,65,.85)'),borderRadius:4}]},options:{...CD,layout:{padding:{top:4,bottom:4}},plugins:{...CD.plugins,tooltip:{...CD.plugins.tooltip,callbacks:{label:ctx=>ctx.raw!=null?` Баланс: ${ctx.raw>=0?'+':''}${fmt(ctx.raw)} грн`:' —'}},datalabels:{display:ctx=>mbArr[ctx.dataIndex]!=null,anchor:ctx=>mbArr[ctx.dataIndex]>=0?'end':'start',align:ctx=>mbArr[ctx.dataIndex]>=0?'end':'start',offset:-2,formatter:v=>(v>=0?'+':'')+(Math.abs(v)>=1000?Math.round(v/1000)+'k':fmt(v)),font:{size:9,weight:'500'},color:ctx=>mbArr[ctx.dataIndex]>=0?'#201f1d':'#7d5411'}},scales:{x:{grid:{display:false},ticks:{color:'#7d7979',font:{size:10},maxRotation:0}},y:{grace:'25%',grid:{color:'#eae7e7'},ticks:{color:'#7d7979',font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
     // ── Excel import for income/expense (multi-year) ──
     const openMyImportBtn=document.getElementById('btn-open-my-import');
