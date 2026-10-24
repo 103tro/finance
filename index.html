@@ -49,6 +49,12 @@ nav{display:flex;justify-content:center;border-bottom:1px solid var(--div)}
 .fc{background:transparent;border:1px solid var(--div);border-radius:4px;padding:16px;margin-bottom:14px}
 .fc.editing{border-color:var(--acc);background:#f8f4f4}
 .fg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.fg4{display:grid;grid-template-columns:1fr 1.4fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.fg4 label,.fg-imp label{font-size:11px;color:var(--n700);font-weight:500;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:4px}
+.fg4 input,.fg4 select,.fg-imp input,.fg-imp select{background:transparent;border:1px solid var(--n400);border-radius:4px;padding:7px 10px;color:var(--text);font-size:13px;outline:none;width:100%}
+.fg-imp{display:grid;grid-template-columns:1.4fr 1fr 1.5fr;gap:10px;margin-bottom:12px}
+@media (max-width:640px){.fg4,.fg-imp{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:400px){.fg4,.fg-imp{grid-template-columns:1fr}}
 .fg label{font-size:11px;color:var(--n700);font-weight:500;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:4px}
 .fg input,.fg select{background:transparent;border:1px solid var(--n400);border-radius:4px;padding:7px 10px;color:var(--text);font-size:13px;outline:none;width:100%}
 .fg input:focus,.fg select:focus{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
@@ -182,10 +188,6 @@ input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px;cursor:point
 .modal-close:hover{color:var(--text)}
 .modal-body{overflow-y:auto;padding:16px 20px;flex:1}
 .modal-foot{padding:12px 20px 16px;border-top:1px solid var(--div);display:flex;justify-content:flex-end;gap:8px}
-.inst-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--div);border-radius:4px;margin-bottom:6px}
-.inst-row input{flex:1;border:1px solid var(--n400);border-radius:4px;padding:5px 8px;font-size:13px;background:transparent;min-width:0}
-.inst-tag{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface);color:var(--n700);white-space:nowrap}
-.inst-sep{font-size:11px;color:var(--n700);font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin:10px 0 6px}
 </style>
 </head>
 <body>
@@ -846,12 +848,6 @@ function calcSet(recs){
   const profit=div+cap; // profit includes ALL dividends regardless of reinvestment
   return{cont,contGross,withdrawn,div,divNotReinv,divReinv,investedTotal,cap,last,profit};
 }
-function curBalDesc(desc,excludeIdxInDesc){
-  // sum amounts (native currency, not base) for records with this desc, excluding one by position-within-desc-array
-  const recs=recsForDesc(desc);
-  let b=0;recs.forEach((r,i)=>{if(i===excludeIdxInDesc)return;b+=r.amount||0;});
-  return b;
-}
 // One big stat box + N smaller "source" boxes beside it, laid out via inline grid-template-columns
 // so the count of satellites is free to grow (new income/invested source types) without CSS changes.
 function bigBoxRow(big,sats){
@@ -873,7 +869,7 @@ function renderInvest(){
   // (cheap, and avoids depending on build()'s local `all`), wireRecForm() attaches handlers.
   function recFormHtml(){
     const all=DB.investments||[];
-    return`<div class="fg" style="grid-template-columns:1fr 1.4fr 1fr 1fr">
+    return`<div class="fg4">
       <div><label>Дата</label><input type="date" id="rf-date" value="${eri>=0?monthStrToISO(all[eri].date):todayISO()}" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
       <div><label>Опис</label><input id="rf-desc" list="desc-datalist" value="${eri>=0?all[eri].desc:''}" placeholder="ОВДП, VT, US-T, Депозит…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
         <datalist id="desc-datalist">${(DB.investDescs||[]).map(d=>`<option value="${d}">`).join('')}</datalist>
@@ -986,12 +982,14 @@ function renderInvest(){
   // "↔ Переказ" — also a modal now, same as the other two forms above.
   function transferFormHtml(){
     return`<div style="font-size:11px;color:#7d7979;margin-bottom:10px">Створює два записи одразу: Виведення в категорії-джерелі і Поповнення в категорії-призначенні. Видаляються теж разом.</div>
-    <div class="fg" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="fg">
       <div><label>Дата</label><input type="date" id="tr-date" value="${todayISO()}" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
       <div><label>Звідки</label><select id="tr-from" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
         ${activeDescs().map(d=>`<option value="${d}">${d}</option>`).join('')}
       </select></div>
-      <div><label>Куди</label><input id="tr-to" list="desc-datalist" placeholder="ОВДП, VT, US-T…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+      <div><label>Куди</label><input id="tr-to" list="desc-datalist" placeholder="ОВДП, VT, US-T…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
+        <datalist id="desc-datalist">${(DB.investDescs||[]).map(d=>`<option value="${d}">`).join('')}</datalist>
+      </div>
     </div>
     <div class="fg" style="grid-template-columns:1fr 1fr">
       <div><label>Сума (звідки, у валюті джерела)</label><input id="tr-amt" type="number" step="0.01" placeholder="0.00" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
@@ -1074,8 +1072,10 @@ function renderInvest(){
   // "Імпорт з Excel" (investment records) — also a modal now.
   function invImportFormHtml(){
     return`<div style="font-size:11px;color:#7d7979;margin-bottom:10px;line-height:1.5">Файл повинен мати колонки: <b>Дата</b> (необов'язково), <b>Тип</b> (Поповнення / Виплата — порожнє = Виплата), <b>Сума</b>. Якщо дата відсутня — проставиться послідовно від 1 січня, відредагуй вручну пізніше.</div>
-    <div class="fg" style="grid-template-columns:1.4fr 1fr 1.5fr">
-      <div><label>Опис</label><input id="imp-desc" list="desc-datalist" placeholder="ОВДП, VT, US-T…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+    <div class="fg-imp">
+      <div><label>Опис</label><input id="imp-desc" list="desc-datalist" placeholder="ОВДП, VT, US-T…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
+        <datalist id="desc-datalist">${(DB.investDescs||[]).map(d=>`<option value="${d}">`).join('')}</datalist>
+      </div>
       <div><label>Валюта</label><select id="imp-cur" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
         ${getCurs().map(c=>`<option value="${c.code}" ${c.code===getBase()?'selected':''}>${c.symbol} ${c.code}</option>`).join('')}
       </select></div>
@@ -1200,9 +1200,6 @@ function renderInvest(){
     const capNat=singleCur?filtered.filter(r=>(r.currency||'UAH')===singleCur&&r.type==='appreciation').reduce((a,r)=>a+(r.amount||0),0):0;
     const notReinvBase=filtered.filter(r=>r.type==='dividends'&&r.reinvested===false).reduce((a,r)=>a+toBase(r.amount||0,r.currency||'UAH'),0);
     const notReinvNat=singleCur?filtered.filter(r=>(r.currency||'UAH')===singleCur&&r.type==='dividends'&&r.reinvested===false).reduce((a,r)=>a+(r.amount||0),0):0;
-    const notReinvDisp=invMode==='native'&&singleCur?fmtM(0,notReinvNat,singleCur):fmtB(notReinvBase);
-    const divPct=setCalc.contGross>0?((divBase/setCalc.contGross)*100).toFixed(1):null;
-    const capPct=setCalc.contGross>0?((capBase/setCalc.contGross)*100).toFixed(1):null;
 
     // Cumulative line chart data — base currency if mixed, native if single currency + native mode
     let cumArr=[];let rs=0;
@@ -1219,7 +1216,6 @@ function renderInvest(){
     const contDisp=invMode==='native'&&natCalc?fmtM(0,natCalc.investedTotal,singleCur):fmtB(setCalc.investedTotal);
     const contGrossDisp=invMode==='native'&&natCalc?fmtM(0,natCalc.contGross,singleCur):fmtB(setCalc.contGross);
     const divReinvDisp=invMode==='native'&&natCalc?fmtM(0,natCalc.divReinv,singleCur):fmtB(setCalc.divReinv);
-    const withdrawnDisp=invMode==='native'&&natCalc?fmtM(0,Math.abs(natCalc.withdrawn),singleCur):fmtB(Math.abs(setCalc.withdrawn));
     const lastDisp=invMode==='native'&&natCalc?fmtM(0,natCalc.last,singleCur):fmtB(setCalc.last);
     const profitVal=invMode==='native'&&natCalc?natCalc.profit:setCalc.profit;
     const profitDisp=invMode==='native'&&natCalc?fmtM(0,natCalc.profit,singleCur):fmtB(setCalc.profit);
@@ -1349,7 +1345,7 @@ function renderInvest(){
     <div id="civ-donuts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px"></div>
     <div class="inv-cards" id="ic"></div>
     <div class="fc ${ey>=1900?'editing':''}" id="ivf"><div class="ct">${ey>=1900?`Редагувати ${ey}`:'Додати/редагувати рік'}</div>
-    <div class="fg" style="grid-template-columns:1fr 1fr 1fr"><div><label>Рік</label><input id="iy" type="number" value="${ey>=1900?ey:new Date().getFullYear()}"></div><div><label>Інше (напр. % банку)</label><input id="io2" type="number" value="${ey>=1900?(DB.investManual.find(d=>d.year===ey)?.other||0):''}"></div><div><label>Податок</label><input id="it" type="number" value="${ey>=1900?(DB.investManual.find(d=>d.year===ey)?.tax||0):''}"></div></div>
+    <div class="fg"><div><label>Рік</label><input id="iy" type="number" value="${ey>=1900?ey:new Date().getFullYear()}"></div><div><label>Інше (напр. % банку)</label><input id="io2" type="number" value="${ey>=1900?(DB.investManual.find(d=>d.year===ey)?.other||0):''}"></div><div><label>Податок</label><input id="it" type="number" value="${ey>=1900?(DB.investManual.find(d=>d.year===ey)?.tax||0):''}"></div></div>
     <div class="btnr-wrap"><button class="btn btnp" id="bisv">Зберегти</button><button class="btn btng" id="bicl">${ey>=1900?'Скасувати':'Очистити'}</button>${ey>=1900?`<button class="btn btnr2" id="bidl">Видалити</button>`:''}</div></div>
     `;
 
