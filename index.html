@@ -586,7 +586,7 @@ function renderCurrentYear(){
     <div class="hint">Розгорни таблицю і натисни на рядок, щоб редагувати</div>`;
   }
   function openMonthForm(){
-    openModal(editMi>=0?`Редагувати: ${M[editMi]} ${selY}`:'Додати / редагувати місяць',monthFormHtml(),wireMonthForm);
+    openModal(editMi>=0?`Редагувати: ${M[editMi]} ${selY}`:'Додати місяць',monthFormHtml(),wireMonthForm);
   }
   function wireMonthForm(){
     document.getElementById('bsv').onclick=()=>{const yr=+document.getElementById('fy').value;const mi=+document.getElementById('fm').value;const inc=parseFloat(document.getElementById('fi').value)||null;const exp=parseFloat(document.getElementById('fe').value)||null;if(!DB.monthly[yr])DB.monthly[yr]={inc:Array(12).fill(null),exp:Array(12).fill(null)};DB.monthly[yr].inc[mi]=inc;DB.monthly[yr].exp[mi]=exp;sv();editMi=-1;closeModal();if(yr===selY)build();};
@@ -679,7 +679,7 @@ function renderCurrentYear(){
     if(tOpen)bldTbl();
     function ledit(mi){editMi=mi;openMonthForm();}
   }
-  document.getElementById('content').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div class="st" style="margin:0;padding:0;border:0">Поточний рік</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btng" id="btn-open-my-import" style="font-size:12px;padding:6px 12px">⇅ Імпорт з Excel</button><button class="btn btnp" id="btn-add-month" style="font-size:12px;padding:6px 14px">+ Додати/редагувати місяць</button></div></div><div id="cy-body"></div>`;
+  document.getElementById('content').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 20px"><div class="st" style="margin:0;padding:0;border:0">Поточний рік</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btnp" id="btn-add-month" style="font-size:12px;padding:6px 14px">+ Додати місяць</button><button class="btn btng" id="btn-open-my-import" style="font-size:12px;padding:6px 12px">⇅ Імпорт з Excel</button></div></div><div id="cy-body"></div>`;
   document.getElementById('btn-add-month').onclick=()=>{editMi=-1;openMonthForm();};
   document.getElementById('btn-open-my-import').onclick=openImportForm;
   setSubnav(`<span style="font-size:11px;color:#605d5d">Рік</span><div class="pills" id="cyp">${gYears().map(y=>`<div class="pill ${y==selY?'on':''}" data-y="${y}" style="border-color:${y==selY?PAL[y]:'#d7d3d3'};color:${y==selY?PAL[y]:'#605d5d'}">${y}</div>`).join('')}</div>`);
@@ -811,7 +811,7 @@ if(snaps.length>1){
 },50);
     document.getElementById('mu').onclick=()=>{mode='uah';build();};document.getElementById('mn').onclick=()=>{mode='native';build();};
   }
-  document.getElementById('content').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div class="st" style="margin:0;padding:0;border:0">Портфель</div><button class="btn btnp" id="btn-add-snapshot" style="font-size:12px;padding:6px 14px">+ Додати знімок портфелю</button></div><div id="pb"></div>`;
+  document.getElementById('content').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 20px"><div class="st" style="margin:0;padding:0;border:0">Портфель</div><button class="btn btnp" id="btn-add-snapshot" style="font-size:12px;padding:6px 14px">+ Додати знімок портфелю</button></div><div id="pb"></div>`;
   document.getElementById('btn-add-snapshot').onclick=()=>{ei=-1;flexItems=[];openSnapshotForm();};
   build();
 }
@@ -982,6 +982,177 @@ function renderInvest(){
     };
   }
 
+  // "↔ Переказ" — also a modal now, same as the other two forms above.
+  function transferFormHtml(){
+    return`<div style="font-size:11px;color:#7d7979;margin-bottom:10px">Створює два записи одразу: Виведення в категорії-джерелі і Поповнення в категорії-призначенні. Видаляються теж разом.</div>
+    <div class="fg" style="grid-template-columns:1fr 1fr 1fr">
+      <div><label>Дата</label><input type="date" id="tr-date" value="${todayISO()}" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+      <div><label>Звідки</label><select id="tr-from" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
+        ${activeDescs().map(d=>`<option value="${d}">${d}</option>`).join('')}
+      </select></div>
+      <div><label>Куди</label><input id="tr-to" list="desc-datalist" placeholder="ОВДП, VT, US-T…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+    </div>
+    <div class="fg" style="grid-template-columns:1fr 1fr">
+      <div><label>Сума (звідки, у валюті джерела)</label><input id="tr-amt" type="number" step="0.01" placeholder="0.00" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+      <div><label style="font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:500;letter-spacing:.06em;display:block;margin-bottom:4px">Баланс джерела зараз</label><div style="padding:6px 0;font-size:13px;color:#605d5d" id="tr-src-bal">—</div></div>
+    </div>
+    <div class="fg" id="tr-conv-wrap" style="grid-template-columns:1fr;display:none">
+      <div><label>Сума (куди, у валюті призначення) <span id="tr-conv-note" style="color:#7d7979;font-weight:400;text-transform:none"></span></label><input id="tr-amt-to" type="number" step="0.01" placeholder="0.00" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+    </div>
+    <div class="btnr-wrap"><button class="btn btnp" id="tr-save">Переказати</button><button class="btn btng" id="tr-cancel">Скасувати</button></div>`;
+  }
+  function openTransferForm(){
+    openModal('Переказ між категоріями',transferFormHtml(),wireTransferForm);
+  }
+  function wireTransferForm(){
+    document.getElementById('tr-cancel').onclick=closeModal;
+    function updTrSrcBal(){
+      const fromDesc=document.getElementById('tr-from')?.value||'';
+      const recs=recsForDesc(fromDesc);
+      let b=0;recs.forEach(r=>b+=r.amount||0);
+      const cur=recs.length?getCur(recs[0].currency||'UAH'):getCur(getBase());
+      const el=document.getElementById('tr-src-bal');if(el)el.textContent=fmt(b)+' '+cur.symbol;
+      updTrConv();
+    }
+    function trFromCur(){
+      const fromDesc=document.getElementById('tr-from')?.value||'';
+      const recs=recsForDesc(fromDesc);
+      return recs.length?recs[0].currency:getBase();
+    }
+    function trToCur(){
+      const toDesc=document.getElementById('tr-to')?.value.trim()||'';
+      const recs=recsForDesc(toDesc);
+      return recs.length?recs[0].currency:null; // null = new/unknown category, no forced currency
+    }
+    function updTrConv(){
+      const fc=trFromCur();const tc=trToCur();
+      const wrap=document.getElementById('tr-conv-wrap');
+      const note=document.getElementById('tr-conv-note');
+      const amtEl=document.getElementById('tr-amt');
+      const amtToEl=document.getElementById('tr-amt-to');
+      if(tc&&tc!==fc){
+        wrap.style.display='block';
+        const fcSym=getCur(fc).symbol,tcSym=getCur(tc).symbol;
+        note.textContent='('+fcSym+' → '+tcSym+', курс застосовано автоматично — можна відредагувати)';
+        const amt=parseFloat(amtEl.value)||0;
+        const amtInTarget=amt*(getCur(fc).rateToBase)/(getCur(tc).rateToBase);
+        amtToEl.value=amtInTarget.toFixed(2);
+      }else{
+        wrap.style.display='none';
+      }
+    }
+    const trFromSel=document.getElementById('tr-from');
+    if(trFromSel){trFromSel.onchange=updTrSrcBal;updTrSrcBal();}
+    const trToInp=document.getElementById('tr-to');
+    if(trToInp)trToInp.addEventListener('input',updTrConv);
+    const trAmtInp=document.getElementById('tr-amt');
+    if(trAmtInp)trAmtInp.addEventListener('input',updTrConv);
+    document.getElementById('tr-save').onclick=()=>{
+      const date=document.getElementById('tr-date').value;
+      const fromDesc=document.getElementById('tr-from').value;
+      const toDesc=document.getElementById('tr-to').value.trim();
+      const amt=parseFloat(document.getElementById('tr-amt').value)||0;
+      if(!date||!fromDesc||!toDesc||!amt){alert('Заповніть усі поля');return;}
+      if(fromDesc===toDesc){alert('Оберіть різні категорії');return;}
+      const fromCur=trFromCur();
+      const existingToCur=trToCur();
+      const toCur=existingToCur||fromCur; // new category defaults to source currency
+      let amtTo=amt;
+      if(existingToCur&&existingToCur!==fromCur){
+        amtTo=parseFloat(document.getElementById('tr-amt-to').value)||amt;
+      }
+      const tid='tr_'+Date.now();
+      DB.investments.push({date,desc:fromDesc,currency:fromCur,type:'withdrawal',amount:-Math.abs(amt),note:'↔ Переказ → '+toDesc,transferId:tid});
+      DB.investments.push({date,desc:toDesc,currency:toCur,type:'contribution',amount:Math.abs(amtTo),note:'↔ Переказ ← '+fromDesc,transferId:tid});
+      rememberDesc(toDesc);
+      DB.investments.sort((a,b2)=>(a.date||'').localeCompare(b2.date||''));
+      sv();closeModal();build();
+    };
+  }
+
+  // "Імпорт з Excel" (investment records) — also a modal now.
+  function invImportFormHtml(){
+    return`<div style="font-size:11px;color:#7d7979;margin-bottom:10px;line-height:1.5">Файл повинен мати колонки: <b>Дата</b> (необов'язково), <b>Тип</b> (Поповнення / Виплата — порожнє = Виплата), <b>Сума</b>. Якщо дата відсутня — проставиться послідовно від 1 січня, відредагуй вручну пізніше.</div>
+    <div class="fg" style="grid-template-columns:1.4fr 1fr 1.5fr">
+      <div><label>Опис</label><input id="imp-desc" list="desc-datalist" placeholder="ОВДП, VT, US-T…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+      <div><label>Валюта</label><select id="imp-cur" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
+        ${getCurs().map(c=>`<option value="${c.code}" ${c.code===getBase()?'selected':''}>${c.symbol} ${c.code}</option>`).join('')}
+      </select></div>
+      <div><label>Файл (.xlsx)</label><input type="file" id="imp-file" accept=".xlsx,.xls" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:5px 9px;font-size:12px;width:100%"></div>
+    </div>
+    <div id="imp-status" style="font-size:11px;color:#605d5d;margin-bottom:8px"></div>
+    <div class="btnr-wrap"><button class="btn btnp" id="btn-do-import">Імпортувати</button><button class="btn btng" id="btn-cancel-import">Скасувати</button></div>`;
+  }
+  function openInvImportForm(){
+    openModal('Імпорт записів з Excel',invImportFormHtml(),wireInvImportForm);
+  }
+  function wireInvImportForm(){
+    document.getElementById('btn-cancel-import').onclick=closeModal;
+    function parseExcelDate(v){
+      if(v==null||v==='')return null;
+      if(v instanceof Date&&!isNaN(v)){
+        // Build ISO date from LOCAL components — avoid UTC shift from toISOString()
+        const y=v.getFullYear(),m=String(v.getMonth()+1).padStart(2,'0'),d=String(v.getDate()).padStart(2,'0');
+        return y+'-'+m+'-'+d;
+      }
+      const s=String(v).trim();
+      let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(m)return m[1]+'-'+m[2]+'-'+m[3];
+      m=s.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/); // no trailing $ — ignore any time suffix
+      if(m)return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
+      return null;
+    }
+    document.getElementById('btn-do-import').onclick=()=>{
+      const desc=document.getElementById('imp-desc').value.trim();
+      const currency=document.getElementById('imp-cur').value;
+      const fileInp=document.getElementById('imp-file');
+      const status=document.getElementById('imp-status');
+      if(!desc){alert('Вкажіть опис');return;}
+      const file=fileInp.files[0];
+      if(!file){alert('Оберіть файл');return;}
+      status.textContent='Читання файлу…';
+      const reader=new FileReader();
+      reader.onerror=()=>{status.textContent='Помилка читання файлу';};
+      reader.onload=ev=>{
+        try{
+          const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
+          const sheet=wb.Sheets[wb.SheetNames[0]];
+          const json=XLSX.utils.sheet_to_json(sheet,{defval:''});
+          if(!json.length){status.textContent='Файл порожній';return;}
+          // Find column names case-insensitively
+          const cols=Object.keys(json[0]);
+          const findCol=(names)=>cols.find(c=>names.some(n=>c.toLowerCase().trim()===n));
+          const dateCol=findCol(['дата','date']);
+          const typeCol=findCol(['тип','type']);
+          const sumCol=findCol(['сума','amount','сума (грн)','sum']);
+          if(!sumCol){status.textContent='Не знайдено колонку "Сума"';return;}
+          let autoYear=new Date().getFullYear(),autoMonth=1; // fallback counter — plain integers, no timezone math
+          let imported=0,skipped=0;
+          json.forEach(row=>{
+            const rawAmt=row[sumCol];
+            const amt=parseFloat(String(rawAmt).replace(/[^0-9.\-]/g,''));
+            if(!amt&&amt!==0){skipped++;return;}
+            let dateISO=dateCol?parseExcelDate(row[dateCol]):null;
+            if(!dateISO){
+              dateISO=autoYear+'-'+String(autoMonth).padStart(2,'0')+'-01';
+              autoMonth++;if(autoMonth>12){autoMonth=1;autoYear++;}
+            }
+            const typeRaw=typeCol?String(row[typeCol]||'').toLowerCase().trim():'';
+            const type=typeRaw.includes('поповн')||typeRaw.includes('contrib')?'contribution':(typeRaw.includes('капітал')||typeRaw.includes('apprec')?'appreciation':(typeRaw.includes('вивед')||typeRaw.includes('withdraw')?'withdrawal':'dividends'));
+            DB.investments.push({date:dateISO,desc,currency,type,amount:type==='withdrawal'?-Math.abs(amt):amt,note:''});
+            imported++;
+          });
+          rememberDesc(desc);
+          DB.investments.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+          sv();
+          status.innerHTML='<span style="color:#201f1d">✓ Імпортовано '+imported+' записів'+(skipped?', пропущено '+skipped+' (без суми)':'')+'</span>';
+          setTimeout(()=>{closeModal();build();},900);
+        }catch(e){status.textContent='Помилка: '+e.message;console.error(e);}
+      };
+      reader.readAsArrayBuffer(file);
+    };
+  }
+
   function build(){
     const all=DB.investments||[];
     const active=activeDescs();
@@ -1122,49 +1293,19 @@ function renderInvest(){
         <label style="white-space:nowrap"><input type="checkbox" id="chk-archived" ${showArchived?'checked':''}> архівні</label>
       </div>`);
     document.getElementById('content').innerHTML=`
-    <div class="st">Інвестиції</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 20px">
+      <div class="st" style="margin:0;padding:0;border:0">Інвестиції</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btnp" id="btn-add-record" style="font-size:12px;padding:6px 14px">+ Додати запис</button>
+        <button class="btn btng" id="btn-open-import" style="font-size:12px;padding:6px 12px">⇅ Імпорт з Excel</button>
+        <button class="btn btng" id="btn-open-transfer" style="font-size:12px;padding:6px 12px">↔ Переказ</button>
+      </div>
+    </div>
     <div class="cc">
       ${metricsHtml}
       <div class="chart-scroll"><div style="position:relative;height:200px;min-width:${Math.max(420,filtered.length*55)}px"><canvas id="civchart"></canvas></div></div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-      <button class="btn btnp" id="btn-add-record" style="font-size:11px;padding:6px 12px">+ Додати запис</button>
-      <button class="cbtn" id="btn-toggle-recs" style="margin-bottom:0">▼ Записи <span style="font-size:10px;color:#605d5d">(${filtered.length})</span></button>
-      <button class="btn btng" id="btn-open-import" style="font-size:11px;padding:6px 12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Імпорт з Excel</button>
-      <button class="btn btng" id="btn-open-transfer" style="font-size:11px;padding:6px 12px">↔ Переказ</button>
-    </div>
-    <div class="fc" id="transfer-form" style="display:none">
-      <div class="ct">Переказ між категоріями</div>
-      <div style="font-size:11px;color:#7d7979;margin-bottom:10px">Створює два записи одразу: Виведення в категорії-джерелі і Поповнення в категорії-призначенні. Видаляються теж разом.</div>
-      <div class="fg" style="grid-template-columns:1fr 1fr 1fr">
-        <div><label>Дата</label><input type="date" id="tr-date" value="${todayISO()}" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
-        <div><label>Звідки</label><select id="tr-from" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
-          ${activeDescs().map(d=>`<option value="${d}">${d}</option>`).join('')}
-        </select></div>
-        <div><label>Куди</label><input id="tr-to" list="desc-datalist" placeholder="ОВДП, VT, US-T…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
-      </div>
-      <div class="fg" style="grid-template-columns:1fr 1fr">
-        <div><label>Сума (звідки, у валюті джерела)</label><input id="tr-amt" type="number" step="0.01" placeholder="0.00" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
-        <div><label style="font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:500;letter-spacing:.06em;display:block;margin-bottom:4px">Баланс джерела зараз</label><div style="padding:6px 0;font-size:13px;color:#605d5d" id="tr-src-bal">—</div></div>
-      </div>
-      <div class="fg" id="tr-conv-wrap" style="grid-template-columns:1fr;display:none">
-        <div><label>Сума (куди, у валюті призначення) <span id="tr-conv-note" style="color:#7d7979;font-weight:400;text-transform:none"></span></label><input id="tr-amt-to" type="number" step="0.01" placeholder="0.00" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
-      </div>
-      <div class="btnr-wrap"><button class="btn btnp" id="tr-save">Переказати</button><button class="btn btng" id="tr-cancel">Скасувати</button></div>
-    </div>
-    <div class="fc" id="import-form" style="display:none">
-      <div class="ct">Імпорт записів з Excel</div>
-      <div style="font-size:11px;color:#7d7979;margin-bottom:10px;line-height:1.5">Файл повинен мати колонки: <b>Дата</b> (необов'язково), <b>Тип</b> (Поповнення / Виплата — порожнє = Виплата), <b>Сума</b>. Якщо дата відсутня — проставиться послідовно від 1 січня, відредагуй вручну пізніше.</div>
-      <div class="fg" style="grid-template-columns:1.4fr 1fr 1.5fr">
-        <div><label>Опис</label><input id="imp-desc" list="desc-datalist" placeholder="ОВДП, VT, US-T…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
-        <div><label>Валюта</label><select id="imp-cur" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
-          ${getCurs().map(c=>`<option value="${c.code}" ${c.code===getBase()?'selected':''}>${c.symbol} ${c.code}</option>`).join('')}
-        </select></div>
-        <div><label>Файл (.xlsx)</label><input type="file" id="imp-file" accept=".xlsx,.xls" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:5px 9px;font-size:12px;width:100%"></div>
-      </div>
-      <div id="imp-status" style="font-size:11px;color:#605d5d;margin-bottom:8px"></div>
-      <div class="btnr-wrap"><button class="btn btnp" id="btn-do-import">Імпортувати</button><button class="btn btng" id="btn-cancel-import">Скасувати</button></div>
-    </div>
+    <button class="cbtn" id="btn-toggle-recs">▼ Записи <span style="font-size:10px;color:#605d5d">(${filtered.length})</span></button>
     <div id="recs-wrap" style="display:none;margin-bottom:10px">
       <div style="display:none;align-items:center;gap:10px;margin-bottom:8px" id="bulk-bar">
         <span style="font-size:11px;color:#605d5d"><span id="bulk-count">0</span> вибрано</span>
@@ -1239,145 +1380,8 @@ function renderInvest(){
     const toggleBtn=document.getElementById('btn-toggle-recs');
     const recsWrap=document.getElementById('recs-wrap');
     if(toggleBtn&&recsWrap){toggleBtn.onclick=()=>{const op=recsWrap.style.display==='none';recsWrap.style.display=op?'block':'none';toggleBtn.innerHTML=(op?'▲':'▼')+' Записи <span style="font-size:10px;color:#605d5d">('+filtered.length+')</span>';};}
-    // ── Transfer between categories ──
-    const openTransferBtn=document.getElementById('btn-open-transfer');
-    const transferForm=document.getElementById('transfer-form');
-    if(openTransferBtn&&transferForm){openTransferBtn.onclick=()=>{transferForm.style.display=transferForm.style.display==='none'?'block':'none';};}
-    const cancelTransferBtn=document.getElementById('tr-cancel');
-    if(cancelTransferBtn)cancelTransferBtn.onclick=()=>{transferForm.style.display='none';};
-    function updTrSrcBal(){
-      const fromDesc=document.getElementById('tr-from')?.value||'';
-      const recs=recsForDesc(fromDesc);
-      let b=0;recs.forEach(r=>b+=r.amount||0);
-      const cur=recs.length?getCur(recs[0].currency||'UAH'):getCur(getBase());
-      const el=document.getElementById('tr-src-bal');if(el)el.textContent=fmt(b)+' '+cur.symbol;
-      updTrConv();
-    }
-    function trFromCur(){
-      const fromDesc=document.getElementById('tr-from')?.value||'';
-      const recs=recsForDesc(fromDesc);
-      return recs.length?recs[0].currency:getBase();
-    }
-    function trToCur(){
-      const toDesc=document.getElementById('tr-to')?.value.trim()||'';
-      const recs=recsForDesc(toDesc);
-      return recs.length?recs[0].currency:null; // null = new/unknown category, no forced currency
-    }
-    function updTrConv(){
-      const fc=trFromCur();const tc=trToCur();
-      const wrap=document.getElementById('tr-conv-wrap');
-      const note=document.getElementById('tr-conv-note');
-      const amtEl=document.getElementById('tr-amt');
-      const amtToEl=document.getElementById('tr-amt-to');
-      if(tc&&tc!==fc){
-        wrap.style.display='block';
-        const fcSym=getCur(fc).symbol,tcSym=getCur(tc).symbol;
-        note.textContent='('+fcSym+' → '+tcSym+', курс застосовано автоматично — можна відредагувати)';
-        const amt=parseFloat(amtEl.value)||0;
-        const amtInTarget=amt*(getCur(fc).rateToBase)/(getCur(tc).rateToBase);
-        amtToEl.value=amtInTarget.toFixed(2);
-      }else{
-        wrap.style.display='none';
-      }
-    }
-    const trFromSel=document.getElementById('tr-from');
-    if(trFromSel){trFromSel.onchange=updTrSrcBal;updTrSrcBal();}
-    const trToInp=document.getElementById('tr-to');
-    if(trToInp)trToInp.addEventListener('input',updTrConv);
-    const trAmtInp=document.getElementById('tr-amt');
-    if(trAmtInp)trAmtInp.addEventListener('input',updTrConv);
-    const trSaveBtn=document.getElementById('tr-save');
-    if(trSaveBtn)trSaveBtn.onclick=()=>{
-      const date=document.getElementById('tr-date').value;
-      const fromDesc=document.getElementById('tr-from').value;
-      const toDesc=document.getElementById('tr-to').value.trim();
-      const amt=parseFloat(document.getElementById('tr-amt').value)||0;
-      if(!date||!fromDesc||!toDesc||!amt){alert('Заповніть усі поля');return;}
-      if(fromDesc===toDesc){alert('Оберіть різні категорії');return;}
-      const fromCur=trFromCur();
-      const existingToCur=trToCur();
-      const toCur=existingToCur||fromCur; // new category defaults to source currency
-      let amtTo=amt;
-      if(existingToCur&&existingToCur!==fromCur){
-        amtTo=parseFloat(document.getElementById('tr-amt-to').value)||amt;
-      }
-      const tid='tr_'+Date.now();
-      DB.investments.push({date,desc:fromDesc,currency:fromCur,type:'withdrawal',amount:-Math.abs(amt),note:'\u2194 Переказ → '+toDesc,transferId:tid});
-      DB.investments.push({date,desc:toDesc,currency:toCur,type:'contribution',amount:Math.abs(amtTo),note:'\u2194 Переказ ← '+fromDesc,transferId:tid});
-      rememberDesc(toDesc);
-      DB.investments.sort((a,b2)=>(a.date||'').localeCompare(b2.date||''));
-      sv();transferForm.style.display='none';build();
-    };
-    // ── Excel import ──
-    const openImportBtn=document.getElementById('btn-open-import');
-    const importForm=document.getElementById('import-form');
-    if(openImportBtn&&importForm){openImportBtn.onclick=()=>{importForm.style.display=importForm.style.display==='none'?'block':'none';};}
-    const cancelImportBtn=document.getElementById('btn-cancel-import');
-    if(cancelImportBtn)cancelImportBtn.onclick=()=>{importForm.style.display='none';document.getElementById('imp-status').textContent='';};
-    function parseExcelDate(v){
-      if(v==null||v==='')return null;
-      if(v instanceof Date&&!isNaN(v)){
-        // Build ISO date from LOCAL components — avoid UTC shift from toISOString()
-        const y=v.getFullYear(),m=String(v.getMonth()+1).padStart(2,'0'),d=String(v.getDate()).padStart(2,'0');
-        return y+'-'+m+'-'+d;
-      }
-      const s=String(v).trim();
-      let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if(m)return m[1]+'-'+m[2]+'-'+m[3];
-      m=s.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/); // no trailing $ — ignore any time suffix
-      if(m)return m[3]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[1]).padStart(2,'0');
-      return null;
-    }
-    const doImportBtn=document.getElementById('btn-do-import');
-    if(doImportBtn)doImportBtn.onclick=()=>{
-      const desc=document.getElementById('imp-desc').value.trim();
-      const currency=document.getElementById('imp-cur').value;
-      const fileInp=document.getElementById('imp-file');
-      const status=document.getElementById('imp-status');
-      if(!desc){alert('Вкажіть опис');return;}
-      const file=fileInp.files[0];
-      if(!file){alert('Оберіть файл');return;}
-      status.textContent='Читання файлу…';
-      const reader=new FileReader();
-      reader.onerror=()=>{status.textContent='Помилка читання файлу';};
-      reader.onload=ev=>{
-        try{
-          const wb=XLSX.read(ev.target.result,{type:'array',cellDates:true});
-          const sheet=wb.Sheets[wb.SheetNames[0]];
-          const json=XLSX.utils.sheet_to_json(sheet,{defval:''});
-          if(!json.length){status.textContent='Файл порожній';return;}
-          // Find column names case-insensitively
-          const cols=Object.keys(json[0]);
-          const findCol=(names)=>cols.find(c=>names.some(n=>c.toLowerCase().trim()===n));
-          const dateCol=findCol(['дата','date']);
-          const typeCol=findCol(['тип','type']);
-          const sumCol=findCol(['сума','amount','сума (грн)','sum']);
-          if(!sumCol){status.textContent='Не знайдено колонку "Сума"';return;}
-          let autoYear=new Date().getFullYear(),autoMonth=1; // fallback counter — plain integers, no timezone math
-          let imported=0,skipped=0;
-          json.forEach(row=>{
-            const rawAmt=row[sumCol];
-            const amt=parseFloat(String(rawAmt).replace(/[^0-9.\-]/g,''));
-            if(!amt&&amt!==0){skipped++;return;}
-            let dateISO=dateCol?parseExcelDate(row[dateCol]):null;
-            if(!dateISO){
-              dateISO=autoYear+'-'+String(autoMonth).padStart(2,'0')+'-01';
-              autoMonth++;if(autoMonth>12){autoMonth=1;autoYear++;}
-            }
-            const typeRaw=typeCol?String(row[typeCol]||'').toLowerCase().trim():'';
-            const type=typeRaw.includes('поповн')||typeRaw.includes('contrib')?'contribution':(typeRaw.includes('капітал')||typeRaw.includes('apprec')?'appreciation':(typeRaw.includes('вивед')||typeRaw.includes('withdraw')?'withdrawal':'dividends'));
-            DB.investments.push({date:dateISO,desc,currency,type,amount:type==='withdrawal'?-Math.abs(amt):amt,note:''});
-            imported++;
-          });
-          rememberDesc(desc);
-          DB.investments.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-          sv();
-          status.innerHTML='<span style="color:#201f1d">✓ Імпортовано '+imported+' записів'+(skipped?', пропущено '+skipped+' (без суми)':'')+'</span>';
-          setTimeout(()=>{importForm.style.display='none';build();},900);
-        }catch(e){status.textContent='Помилка: '+e.message;console.error(e);}
-      };
-      reader.readAsArrayBuffer(file);
-    };
+    document.getElementById('btn-open-transfer').onclick=openTransferForm;
+    document.getElementById('btn-open-import').onclick=openInvImportForm;
     filtered.forEach(r=>{
       const gi=all.indexOf(r);
       const eb=document.getElementById('rec-e-'+gi);const db2=document.getElementById('rec-d-'+gi);
