@@ -200,6 +200,7 @@ input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px;cursor:point
 <div id="subnav" class="subnav" hidden><div class="subnav-inner" id="subnav-inner"></div></div>
 </header>
 <div id="content"><div style="color:#605d5d;padding:40px;text-align:center">Завантаження...</div></div>
+<div class="modal-backdrop" id="modal-backdrop"><div class="modal-box"><div class="modal-head"><div class="modal-head-title" id="modal-title"></div><button class="modal-close" id="modal-close-btn" aria-label="Закрити">&times;</button></div><div class="modal-body" id="modal-body"></div></div></div>
 
 <script>
 Chart.register(ChartDataLabels);
@@ -265,6 +266,21 @@ async function ensureHistoricalRates(dates,onProgress){
 }
 
 function sv(){try{DB=migrate(DB);localStorage.setItem(KEY,JSON.stringify(DB));const el=document.getElementById('save-ind');if(el){el.textContent='✓ Збережено';el.style.opacity='1';clearTimeout(el._t);el._t=setTimeout(()=>el.style.opacity='0',1500);}}catch(e){console.error('save error',e);}}
+// Generic popup used by every "Додати…" form: openModal() fills it and shows it, wireFn (if
+// given) runs right after so it can attach handlers to the HTML it just injected.
+function openModal(title,html,wireFn){
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-backdrop').classList.add('open');
+  if(wireFn)wireFn();
+}
+function closeModal(){
+  document.getElementById('modal-backdrop').classList.remove('open');
+  document.getElementById('modal-body').innerHTML='';
+}
+document.getElementById('modal-close-btn').onclick=closeModal;
+document.getElementById('modal-backdrop').onclick=e=>{if(e.target.id==='modal-backdrop')closeModal();};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('modal-backdrop').classList.contains('open'))closeModal();});
 function getCurs(){return DB.currencies&&DB.currencies.length?DB.currencies:JSON.parse(JSON.stringify(DC));}
 function getBase(){return DB.baseCurrency||'UAH';}
 function getCur(code){return getCurs().find(c=>c.code===code)||{code,symbol:code,name:code,rateToBase:1};}
@@ -561,43 +577,33 @@ function renderCurrentYear(){
   let years=gYears();
   if(!years.length){const cy=new Date().getFullYear();DB.monthly[cy]={inc:Array(12).fill(null),exp:Array(12).fill(null)};sv();years=gYears();}
   let selY=Math.max(...years);let tOpen=false;
-  function build(){
-    if(!DB.monthly[selY])DB.monthly[selY]={inc:Array(12).fill(null),exp:Array(12).fill(null)};
-    const d=DB.monthly[selY];const t=tots(selY);let lM=-1;for(let i=11;i>=0;i--){if(d.inc[i]!=null){lM=i;break;}}
-    const lI=lM>=0?d.inc[lM]:0,lE=lM>=0?d.exp[lM]:0;const fc=d.inc.filter(v=>v!=null).length;
-    const mbArr=M.map((_,i)=>(d.inc[i]==null&&d.exp[i]==null)?null:(d.inc[i]||0)-(d.exp[i]||0));
-    document.getElementById('cy-body').innerHTML=`
-    <div class="cards2"><div class="card"><div class="cl">${lM>=0?M[lM]+' — баланс':'Немає даних'}</div><div class="cv ${(lI-lE)>=0?'pos':'neg'}">${sgn(lI-lE)}${fmt(lI-lE)} грн</div><div class="cs">дох. ${fmt(lI)} · вит. ${fmt(lE)}</div></div><div class="card"><div class="cl">Доходи за рік</div><div class="cv gold">${fmt(t.inc)} грн</div></div><div class="card"><div class="cl">Баланс за рік</div><div class="cv ${t.bal>=0?'pos':'neg'}">${sgn(t.bal)}${fmt(t.bal)} грн</div></div><div class="card"><div class="cl">Витрати за рік</div><div class="cv" style="color:#7d5411">${fmt(t.exp)} грн</div></div></div>
-    <div class="cc"><div class="ct">Доходи та витрати — ${selY}</div><div class="chart-scroll"><div style="position:relative;height:200px;min-width:420px"><canvas id="ccy"></canvas></div></div><div class="lr"><span class="li"><span style="width:12px;height:12px;background:rgba(68,65,65,.85);border-radius:2px;display:inline-block"></span>Доходи</span><span class="li"><span style="width:12px;height:12px;background:rgba(194,141,65,.85);border-radius:2px;display:inline-block"></span>Витрати</span></div></div>
-    <div class="cc"><div class="ct">Баланс по місяцях — ${selY}</div><div class="chart-scroll"><div style="position:relative;height:180px;min-width:420px"><canvas id="ccyb"></canvas></div></div></div>
-    <button class="cbtn" id="btbl"><span>${tOpen?'▲':'▼'} Місячна таблиця — ${selY}</span><span style="font-size:10px;color:#605d5d">${fc} з 12 місяців</span></button>
-    <div id="cyw" style="display:${tOpen?'block':'none'};margin-bottom:12px"><div class="cc" style="padding:12px"><table class="mt"><thead><tr><th>Місяць</th><th>Доходи</th><th>Витрати</th><th>Баланс</th><th></th></tr></thead><tbody id="ctb"></tbody></table></div></div>
-    <div style="margin-bottom:8px"><button class="btn btng" id="btn-open-my-import" style="font-size:11px;padding:6px 12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Імпорт з Excel (декілька років)</button></div>
-    <div class="fc" id="my-import-form" style="display:none">
-      <div class="ct">Імпорт доходів/витрат з Excel</div>
-      <div style="font-size:11px;color:#7d7979;margin-bottom:10px;line-height:1.5">Файл повинен мати колонки: <b>Рік</b>, <b>Місяць</b> (число 1-12 або назва), <b>Доходи</b>, <b>Витрати</b>. Один рядок = один місяць. Можна одразу декілька років в одному файлі.</div>
-      <input type="file" id="my-imp-file" accept=".xlsx,.xls" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:5px 9px;font-size:12px;width:100%;margin-bottom:8px">
-      <div id="my-imp-status" style="font-size:11px;color:#605d5d;margin-bottom:8px"></div>
-      <div class="btnr-wrap"><button class="btn btnp" id="btn-do-my-import">Імпортувати</button><button class="btn btng" id="btn-cancel-my-import">Скасувати</button></div>
-    </div>
-    <div class="fc" id="cyf"><div class="ct" id="cyt">Додати / редагувати місяць</div>
-    <div class="fg"><div><label>Рік</label><input id="fy" type="number" value="${selY}"></div><div><label>Місяць</label><select id="fm">${M.map((m,i)=>`<option value="${i}">${m}</option>`).join('')}</select></div><div><label>Доходи грн</label><input id="fi" type="number" placeholder="0"></div><div><label>Витрати грн</label><input id="fe" type="number" placeholder="0"></div></div>
-    <div class="btnr-wrap"><button class="btn btnp" id="bsv">Зберегти</button><button class="btn btng" id="bcl">Очистити</button><button class="btn btnr2" id="bdl" style="display:none">Видалити місяць</button></div>
-    <div class="hint">Розгорни таблицю і натисни на рядок, щоб редагувати</div></div>`;
-    mk('ccy',{type:'bar',data:{labels:M,datasets:[
-      {label:'Доходи',data:d.inc,backgroundColor:'rgba(68,65,65,.85)',borderRadius:4,barPercentage:.6},
-      {label:'Витрати',data:d.exp,backgroundColor:'rgba(194,141,65,.85)',borderRadius:4,barPercentage:.6}
-    ]},options:{...CD,interaction:{mode:'index',intersect:false},layout:{padding:{top:22}},plugins:{...CD.plugins,
-      tooltip:{...CD.plugins.tooltip,callbacks:{label:ctx=>ctx.raw!=null?` ${ctx.dataset.label}: ${fmt(ctx.raw)} ${BS}`:' —'}},
-      datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,anchor:'end',align:'end',offset:-2,formatter:v=>v>=1000?(v/1000).toFixed(0)+'k':fmt(v),font:{size:9,weight:'500'},color:ctx=>ctx.datasetIndex===0?'#201f1d':'#7d5411'}
-    },scales:{x:{grid:{display:false},ticks:{color:'#7d7979',font:{size:10},maxRotation:0}},y:{grace:'20%',grid:{color:'#eae7e7'},ticks:{color:'#7d7979',font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
-    mk('ccyb',{type:'bar',data:{labels:M,datasets:[{label:'Баланс',data:mbArr,backgroundColor:mbArr.map(b=>b==null?'transparent':b>=0?'rgba(68,65,65,.85)':'rgba(194,141,65,.85)'),borderRadius:4}]},options:{...CD,layout:{padding:{top:4,bottom:4}},plugins:{...CD.plugins,tooltip:{...CD.plugins.tooltip,callbacks:{label:ctx=>ctx.raw!=null?` Баланс: ${ctx.raw>=0?'+':''}${fmt(ctx.raw)} грн`:' —'}},datalabels:{display:ctx=>mbArr[ctx.dataIndex]!=null,anchor:ctx=>mbArr[ctx.dataIndex]>=0?'end':'start',align:ctx=>mbArr[ctx.dataIndex]>=0?'end':'start',offset:-2,formatter:v=>(v>=0?'+':'')+(Math.abs(v)>=1000?Math.round(v/1000)+'k':fmt(v)),font:{size:9,weight:'500'},color:ctx=>mbArr[ctx.dataIndex]>=0?'#201f1d':'#7d5411'}},scales:{x:{grid:{display:false},ticks:{color:'#7d7979',font:{size:10},maxRotation:0}},y:{grace:'25%',grid:{color:'#eae7e7'},ticks:{color:'#7d7979',font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
-    // ── Excel import for income/expense (multi-year) ──
-    const openMyImportBtn=document.getElementById('btn-open-my-import');
-    const myImportForm=document.getElementById('my-import-form');
-    if(openMyImportBtn&&myImportForm)openMyImportBtn.onclick=()=>{myImportForm.style.display=myImportForm.style.display==='none'?'block':'none';};
-    const cancelMyImportBtn=document.getElementById('btn-cancel-my-import');
-    if(cancelMyImportBtn)cancelMyImportBtn.onclick=()=>{myImportForm.style.display='none';document.getElementById('my-imp-status').textContent='';};
+  let editMi=-1; // month index open in the "Додати/редагувати місяць" modal, -1 = blank/add
+  function monthFormHtml(){
+    const d=DB.monthly[selY]||{inc:Array(12).fill(null),exp:Array(12).fill(null)};
+    const inc=editMi>=0?d.inc[editMi]:null,exp=editMi>=0?d.exp[editMi]:null;
+    return`<div class="fg"><div><label>Рік</label><input id="fy" type="number" value="${selY}"></div><div><label>Місяць</label><select id="fm">${M.map((m,i)=>`<option value="${i}" ${editMi===i?'selected':''}>${m}</option>`).join('')}</select></div><div><label>Доходи грн</label><input id="fi" type="number" placeholder="0" value="${inc!=null?inc:''}"></div><div><label>Витрати грн</label><input id="fe" type="number" placeholder="0" value="${exp!=null?exp:''}"></div></div>
+    <div class="btnr-wrap"><button class="btn btnp" id="bsv">Зберегти</button><button class="btn btng" id="bcl">Очистити</button>${editMi>=0?`<button class="btn btnr2" id="bdl">Видалити місяць</button>`:''}</div>
+    <div class="hint">Розгорни таблицю і натисни на рядок, щоб редагувати</div>`;
+  }
+  function openMonthForm(){
+    openModal(editMi>=0?`Редагувати: ${M[editMi]} ${selY}`:'Додати / редагувати місяць',monthFormHtml(),wireMonthForm);
+  }
+  function wireMonthForm(){
+    document.getElementById('bsv').onclick=()=>{const yr=+document.getElementById('fy').value;const mi=+document.getElementById('fm').value;const inc=parseFloat(document.getElementById('fi').value)||null;const exp=parseFloat(document.getElementById('fe').value)||null;if(!DB.monthly[yr])DB.monthly[yr]={inc:Array(12).fill(null),exp:Array(12).fill(null)};DB.monthly[yr].inc[mi]=inc;DB.monthly[yr].exp[mi]=exp;sv();editMi=-1;closeModal();if(yr===selY)build();};
+    document.getElementById('bcl').onclick=()=>{editMi=-1;openMonthForm();};
+    const bdl=document.getElementById('bdl');if(bdl)bdl.onclick=()=>{DB.monthly[selY].inc[editMi]=null;DB.monthly[selY].exp[editMi]=null;sv();editMi=-1;closeModal();build();};
+  }
+  function importFormHtml(){
+    return`<div style="font-size:11px;color:#7d7979;margin-bottom:10px;line-height:1.5">Файл повинен мати колонки: <b>Рік</b>, <b>Місяць</b> (число 1-12 або назва), <b>Доходи</b>, <b>Витрати</b>. Один рядок = один місяць. Можна одразу декілька років в одному файлі.</div>
+    <input type="file" id="my-imp-file" accept=".xlsx,.xls" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:5px 9px;font-size:12px;width:100%;margin-bottom:8px">
+    <div id="my-imp-status" style="font-size:11px;color:#605d5d;margin-bottom:8px"></div>
+    <div class="btnr-wrap"><button class="btn btnp" id="btn-do-my-import">Імпортувати</button><button class="btn btng" id="btn-cancel-my-import">Скасувати</button></div>`;
+  }
+  function openImportForm(){
+    openModal('Імпорт доходів/витрат з Excel',importFormHtml(),wireImportForm);
+  }
+  function wireImportForm(){
+    document.getElementById('btn-cancel-my-import').onclick=closeModal;
     function parseMonthValue(v){
       if(v==null||v==='')return null;
       if(typeof v==='number')return Math.round(v)-1; // 1-12 -> 0-11
@@ -607,8 +613,7 @@ function renderCurrentYear(){
       const idx=M.findIndex(m=>m.toLowerCase().startsWith(s.slice(0,3)));
       return idx>=0?idx:null;
     }
-    const doMyImportBtn=document.getElementById('btn-do-my-import');
-    if(doMyImportBtn)doMyImportBtn.onclick=()=>{
+    document.getElementById('btn-do-my-import').onclick=()=>{
       const fileInp=document.getElementById('my-imp-file');
       const status=document.getElementById('my-imp-status');
       const file=fileInp.files[0];
@@ -644,19 +649,39 @@ function renderCurrentYear(){
           });
           sv();
           status.innerHTML='<span style="color:#201f1d">✓ Імпортовано '+imported+' місяців'+(skipped?', пропущено '+skipped:'')+'</span>';
-          setTimeout(()=>{myImportForm.style.display='none';years=gYears();selY=Math.max(...years);build();},900);
+          setTimeout(()=>{closeModal();years=gYears();selY=Math.max(...years);build();},900);
         }catch(e){status.textContent='Помилка: '+e.message;console.error(e);}
       };
       reader.readAsArrayBuffer(file);
     };
+  }
+  function build(){
+    if(!DB.monthly[selY])DB.monthly[selY]={inc:Array(12).fill(null),exp:Array(12).fill(null)};
+    const d=DB.monthly[selY];const t=tots(selY);let lM=-1;for(let i=11;i>=0;i--){if(d.inc[i]!=null){lM=i;break;}}
+    const lI=lM>=0?d.inc[lM]:0,lE=lM>=0?d.exp[lM]:0;const fc=d.inc.filter(v=>v!=null).length;
+    const mbArr=M.map((_,i)=>(d.inc[i]==null&&d.exp[i]==null)?null:(d.inc[i]||0)-(d.exp[i]||0));
+    document.getElementById('cy-body').innerHTML=`
+    <div class="cards2"><div class="card"><div class="cl">${lM>=0?M[lM]+' — баланс':'Немає даних'}</div><div class="cv ${(lI-lE)>=0?'pos':'neg'}">${sgn(lI-lE)}${fmt(lI-lE)} грн</div><div class="cs">дох. ${fmt(lI)} · вит. ${fmt(lE)}</div></div><div class="card"><div class="cl">Доходи за рік</div><div class="cv gold">${fmt(t.inc)} грн</div></div><div class="card"><div class="cl">Баланс за рік</div><div class="cv ${t.bal>=0?'pos':'neg'}">${sgn(t.bal)}${fmt(t.bal)} грн</div></div><div class="card"><div class="cl">Витрати за рік</div><div class="cv" style="color:#7d5411">${fmt(t.exp)} грн</div></div></div>
+    <div class="cc"><div class="ct">Доходи та витрати — ${selY}</div><div class="chart-scroll"><div style="position:relative;height:200px;min-width:420px"><canvas id="ccy"></canvas></div></div><div class="lr"><span class="li"><span style="width:12px;height:12px;background:rgba(68,65,65,.85);border-radius:2px;display:inline-block"></span>Доходи</span><span class="li"><span style="width:12px;height:12px;background:rgba(194,141,65,.85);border-radius:2px;display:inline-block"></span>Витрати</span></div></div>
+    <div class="cc"><div class="ct">Баланс по місяцях — ${selY}</div><div class="chart-scroll"><div style="position:relative;height:180px;min-width:420px"><canvas id="ccyb"></canvas></div></div></div>
+    <button class="cbtn" id="btbl"><span>${tOpen?'▲':'▼'} Місячна таблиця — ${selY}</span><span style="font-size:10px;color:#605d5d">${fc} з 12 місяців</span></button>
+    <div id="cyw" style="display:${tOpen?'block':'none'};margin-bottom:12px"><div class="cc" style="padding:12px"><table class="mt"><thead><tr><th>Місяць</th><th>Доходи</th><th>Витрати</th><th>Баланс</th><th></th></tr></thead><tbody id="ctb"></tbody></table></div></div>`;
+    mk('ccy',{type:'bar',data:{labels:M,datasets:[
+      {label:'Доходи',data:d.inc,backgroundColor:'rgba(68,65,65,.85)',borderRadius:4,barPercentage:.6},
+      {label:'Витрати',data:d.exp,backgroundColor:'rgba(194,141,65,.85)',borderRadius:4,barPercentage:.6}
+    ]},options:{...CD,interaction:{mode:'index',intersect:false},layout:{padding:{top:22}},plugins:{...CD.plugins,
+      tooltip:{...CD.plugins.tooltip,callbacks:{label:ctx=>ctx.raw!=null?` ${ctx.dataset.label}: ${fmt(ctx.raw)} ${BS}`:' —'}},
+      datalabels:{display:ctx=>ctx.dataset.data[ctx.dataIndex]!=null,anchor:'end',align:'end',offset:-2,formatter:v=>v>=1000?(v/1000).toFixed(0)+'k':fmt(v),font:{size:9,weight:'500'},color:ctx=>ctx.datasetIndex===0?'#201f1d':'#7d5411'}
+    },scales:{x:{grid:{display:false},ticks:{color:'#7d7979',font:{size:10},maxRotation:0}},y:{grace:'20%',grid:{color:'#eae7e7'},ticks:{color:'#7d7979',font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
+    mk('ccyb',{type:'bar',data:{labels:M,datasets:[{label:'Баланс',data:mbArr,backgroundColor:mbArr.map(b=>b==null?'transparent':b>=0?'rgba(68,65,65,.85)':'rgba(194,141,65,.85)'),borderRadius:4}]},options:{...CD,layout:{padding:{top:4,bottom:4}},plugins:{...CD.plugins,tooltip:{...CD.plugins.tooltip,callbacks:{label:ctx=>ctx.raw!=null?` Баланс: ${ctx.raw>=0?'+':''}${fmt(ctx.raw)} грн`:' —'}},datalabels:{display:ctx=>mbArr[ctx.dataIndex]!=null,anchor:ctx=>mbArr[ctx.dataIndex]>=0?'end':'start',align:ctx=>mbArr[ctx.dataIndex]>=0?'end':'start',offset:-2,formatter:v=>(v>=0?'+':'')+(Math.abs(v)>=1000?Math.round(v/1000)+'k':fmt(v)),font:{size:9,weight:'500'},color:ctx=>mbArr[ctx.dataIndex]>=0?'#201f1d':'#7d5411'}},scales:{x:{grid:{display:false},ticks:{color:'#7d7979',font:{size:10},maxRotation:0}},y:{grace:'25%',grid:{color:'#eae7e7'},ticks:{color:'#7d7979',font:{size:10},callback:v=>(v/1000).toFixed(0)+'k'}}}}});
     document.getElementById('btbl').onclick=()=>{tOpen=!tOpen;document.getElementById('cyw').style.display=tOpen?'block':'none';document.getElementById('btbl').innerHTML=`<span>${tOpen?'▲':'▼'} Місячна таблиця — ${selY}</span><span style="font-size:10px;color:#605d5d">${fc} з 12 місяців</span>`;if(tOpen)bldTbl();};
     function bldTbl(){const tb=document.getElementById('ctb');if(!tb)return;tb.innerHTML='';M.forEach((m,i)=>{const inc=d.inc[i],exp=d.exp[i];if(inc==null&&exp==null){tb.innerHTML+=`<tr><td style="color:#9b9797">${m}</td><td colspan="4" style="color:#d7d3d3">—</td></tr>`;return;}const b=(inc||0)-(exp||0);tb.innerHTML+=`<tr data-m="${i}" style="cursor:pointer"><td>${m}</td><td class="gold">${inc!=null?fmt(inc):'—'}</td><td>${exp!=null?fmt(exp):'—'}</td><td class="${b>=0?'pos':'neg'}">${b>=0?'+':''}${fmt(b)}</td><td><button class="ic" data-m="${i}">✎</button></td></tr>`;});document.querySelectorAll('#ctb tr[data-m]').forEach(tr=>{tr.onclick=(e)=>{if(e.target.tagName==='BUTTON')return;ledit(+tr.dataset.m);};const bn=tr.querySelector('.ic');if(bn)bn.onclick=(e)=>{e.stopPropagation();ledit(+bn.dataset.m);};});}
     if(tOpen)bldTbl();
-    function ledit(mi){document.getElementById('fy').value=selY;document.getElementById('fm').value=mi;document.getElementById('fi').value=d.inc[mi]||'';document.getElementById('fe').value=d.exp[mi]||'';document.getElementById('bdl').style.display='inline-block';document.getElementById('cyt').textContent=`Редагувати: ${M[mi]} ${selY}`;document.getElementById('cyf').classList.add('editing');document.getElementById('bdl').onclick=()=>{DB.monthly[selY].inc[mi]=null;DB.monthly[selY].exp[mi]=null;sv();build();};}
-    document.getElementById('bsv').onclick=()=>{const yr=+document.getElementById('fy').value;const mi=+document.getElementById('fm').value;const inc=parseFloat(document.getElementById('fi').value)||null;const exp=parseFloat(document.getElementById('fe').value)||null;if(!DB.monthly[yr])DB.monthly[yr]={inc:Array(12).fill(null),exp:Array(12).fill(null)};DB.monthly[yr].inc[mi]=inc;DB.monthly[yr].exp[mi]=exp;sv();if(yr===selY)build();};
-    document.getElementById('bcl').onclick=()=>{document.getElementById('fi').value='';document.getElementById('fe').value='';document.getElementById('bdl').style.display='none';document.getElementById('cyt').textContent='Додати / редагувати місяць';document.getElementById('cyf').classList.remove('editing');};
+    function ledit(mi){editMi=mi;openMonthForm();}
   }
-  document.getElementById('content').innerHTML=`<div class="st">Поточний рік</div><div id="cy-body"></div>`;
+  document.getElementById('content').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div class="st" style="margin:0;padding:0;border:0">Поточний рік</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btng" id="btn-open-my-import" style="font-size:12px;padding:6px 12px">⇅ Імпорт з Excel</button><button class="btn btnp" id="btn-add-month" style="font-size:12px;padding:6px 14px">+ Додати/редагувати місяць</button></div></div><div id="cy-body"></div>`;
+  document.getElementById('btn-add-month').onclick=()=>{editMi=-1;openMonthForm();};
+  document.getElementById('btn-open-my-import').onclick=openImportForm;
   setSubnav(`<span style="font-size:11px;color:#605d5d">Рік</span><div class="pills" id="cyp">${gYears().map(y=>`<div class="pill ${y==selY?'on':''}" data-y="${y}" style="border-color:${y==selY?PAL[y]:'#d7d3d3'};color:${y==selY?PAL[y]:'#605d5d'}">${y}</div>`).join('')}</div>`);
   document.querySelectorAll('#cyp .pill').forEach(p=>{p.onclick=()=>{selY=+p.dataset.y;tOpen=false;document.querySelectorAll('#cyp .pill').forEach(pp=>{const py=+pp.dataset.y;pp.classList.toggle('on',py==selY);pp.style.borderColor=py==selY?PAL[py]:'#d7d3d3';pp.style.color=py==selY?PAL[py]:'#605d5d';});build();};});
   build();
@@ -682,25 +707,18 @@ function renderPortfolio(){
   const s=DB.portfolio[si];if(!s)return{date:'',usdR:44.6,eurR:51,uf:0,ud:0,uo:0,sf:0,si2:0,ef:0,labels:{...DFL}};
   if(s.type==='flex'){return{date:s.date,usdR:s.rates?.usd||44.6,eurR:s.rates?.eur||51,uf:0,ud:0,uo:0,sf:0,si2:0,ef:0,labels:{...DFL}};}
   return{date:s.date,usdR:s.rates?.usd||44.6,eurR:s.rates?.eur||51,uf:s.uah?.free||0,ud:s.uah?.deposit||0,uo:s.uah?.ovdp||0,sf:s.usd?.free||0,si2:s.usd?.ibkr||0,ef:s.eur?.free||0,labels:{...DFL,...(s.labels||{})}};}
-  function build(){
-    const snaps=DB.portfolio||[];const v=fv(ei);
-    let sh='';snaps.forEach((s,si)=>{const c=calcS(s);const total=Math.round(c.total);
-      const rSum=(isR(s)||s.type==='flex')?`<div class="fw"><div class="fw-f"><div style="font-size:10px;color:#201f1d;font-weight:600;letter-spacing:.04em;text-transform:uppercase">Вільні</div><div style="font-size:14px;font-weight:300;color:#201f1d">${fmt(Math.round(c.freeUah))} ${BS}</div></div><div class="fw-w"><div style="font-size:10px;color:#a06f24;font-weight:600;letter-spacing:.04em;text-transform:uppercase">В роботі</div><div style="font-size:14px;font-weight:300;color:#a06f24">${fmt(Math.round(c.inWorkUah))} ${BS}</div></div></div>`:'';
-      const rLeg='';
-      sh+=`<div class="ps ${si===ei?'ae':''}"><div class="ps-hd"><span style="font-size:12px;color:#605d5d">${s.date}</span><span style="font-size:16px;font-weight:300;color:#a06f24">${fmt(total)} ${BS}</span></div>${rSum}<div style="position:relative;height:160px;min-height:140px"><canvas id="pie${si}"></canvas></div><div style="margin-top:10px">${sBars(s)}</div>${rLeg}<div class="ps-acts"><button class="btn btng" style="font-size:11px;padding:4px 10px" id="es${si}">Редагувати</button><button class="btn btnr2" style="font-size:11px;padding:4px 10px" id="ds${si}">Видалити</button></div></div>`;});
-    setSubnav(`<span style="font-size:11px;color:#605d5d">Відображення</span><div class="toggle-btn"><button class="toggle-opt ${mode==='uah'?'on':''}" id="mu">${BS}</button><button class="toggle-opt ${mode==='native'?'on':''}" id="mn">За валютою</button></div>`);
-    document.getElementById('pb').innerHTML=`
-    <div class="g2" id="sg">${sh}</div>
-    ${snaps.length>1?`<div class="cc"><div class="ct">Загальна вартість</div><div style="position:relative;height:130px"><canvas id="cpt"></canvas></div></div>
-    <div class="cc"><div class="ct">Крок росту</div><div style="position:relative;height:130px"><canvas id="cpt-step"></canvas></div></div>`:''}
-    <div class="fc ${ei>=0?'editing':''}" id="pf"><div class="ct">${ei>=0?`Редагувати: ${DB.portfolio[ei]?.date}`:'Додати знімок портфелю'}</div>
-    <div class="fg"><div><label>Назва</label><input id="pd" placeholder="Серпень 2026" value="${v.date}"></div><div><label>Курс USD ₴</label><input id="pru" type="number" step="0.1" value="${v.usdR}"></div><div><label>Курс EUR ₴</label><input id="pre" type="number" step="0.1" value="${v.eurR}"></div></div>
+  // "Додати знімок портфелю" lives in the modal now — formHtml() renders its fields,
+  // wireForm() attaches handlers after openModal() injects that html, and openSnapshotForm()
+  // does both together (used for add, edit, and any in-modal refresh like adding a flex row).
+  function formHtml(){
+    const v=fv(ei);
+    return`<div class="fg"><div><label>Назва</label><input id="pd" placeholder="Серпень 2026" value="${v.date}"></div><div><label>Курс USD ₴</label><input id="pru" type="number" step="0.1" value="${v.usdR}"></div><div><label>Курс EUR ₴</label><input id="pre" type="number" step="0.1" value="${v.eurR}"></div></div>
     <div style="font-size:10px;color:#4f6d8f;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:8px 0">Гривня ₴</div>
-    <div class="fg"><div><label><input class="fl-edit" data-key="uf" value="${v.labels.uf}" style="width:60px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> ₴</label><input id="puf" type="number" value="${v.uf||''}"></div><div><label><input class="fl-edit" data-key="ud" value="${v.labels.ud}" style="width:60px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> ₴</label><input id="pud" type="number" value="${v.ud||''}"></div><div><label><input class="fl-edit" data-key="uo" value="${v.labels.uo}" style="width:60px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> ₴</label><input id="puo" type="number" value="${v.uo||''}"></div></div>
+    <div class="fg"><div><label><input class="fl-edit" data-key="uf" value="${v.labels.uf}" style="width:84px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> ₴</label><input id="puf" type="number" value="${v.uf||''}"></div><div><label><input class="fl-edit" data-key="ud" value="${v.labels.ud}" style="width:84px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> ₴</label><input id="pud" type="number" value="${v.ud||''}"></div><div><label><input class="fl-edit" data-key="uo" value="${v.labels.uo}" style="width:84px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> ₴</label><input id="puo" type="number" value="${v.uo||''}"></div></div>
     <div style="font-size:10px;color:#3f7a5c;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:8px 0">Долар $</div>
-    <div class="fg"><div><label><input class="fl-edit" data-key="sf" value="${v.labels.sf}" style="width:60px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> $</label><input id="psf" type="number" value="${v.sf||''}"></div><div><label><input class="fl-edit" data-key="si2" value="${v.labels.si2}" style="width:60px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> $</label><input id="psi" type="number" value="${v.si2||''}"></div></div>
+    <div class="fg"><div><label><input class="fl-edit" data-key="sf" value="${v.labels.sf}" style="width:84px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> $</label><input id="psf" type="number" value="${v.sf||''}"></div><div><label><input class="fl-edit" data-key="si2" value="${v.labels.si2}" style="width:84px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> $</label><input id="psi" type="number" value="${v.si2||''}"></div></div>
     <div style="font-size:10px;color:#a06f24;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:8px 0">Євро €</div>
-    <div class="fg"><div><label><input class="fl-edit" data-key="ef" value="${v.labels.ef}" style="width:60px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> €</label><input id="pef" type="number" value="${v.ef||''}"></div></div>
+    <div class="fg"><div><label><input class="fl-edit" data-key="ef" value="${v.labels.ef}" style="width:84px;border:none;border-bottom:1px dashed #9b9797;background:transparent;font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:600;letter-spacing:.04em;padding:0"> €</label><input id="pef" type="number" value="${v.ef||''}"></div></div>
     ${flexItems.length>0?`<div style="font-size:10px;color:#605d5d;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin:10px 0 6px">Додаткові статті</div>`:''}
     <div id="flex-rows">${flexItems.map((it,idx)=>`<div class="flex-row" data-idx="${idx}" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
       <input class="fr-lbl" placeholder="Назва" value="${it.lbl||''}" style="flex:2;background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:5px 8px;font-size:12px;min-width:0">
@@ -716,7 +734,55 @@ function renderPortfolio(){
     </div>`).join('')}</div>
     <button id="btn-add-row" class="btn btng" style="margin-bottom:10px;font-size:12px">+ Додати статтю</button>
     <div class="btnr-wrap"><button class="btn btnp" id="bpsv">Зберегти</button><button class="btn btng" id="bpcl">Очистити</button>${ei>=0?`<button class="btn btnr2" id="bpdl">Видалити</button>`:''}</div>
-    <div id="ppv" style="margin-top:8px;font-size:11px;color:#605d5d"></div></div>`;
+    <div id="ppv" style="margin-top:8px;font-size:11px;color:#605d5d"></div>`;
+  }
+  function openSnapshotForm(){
+    openModal(ei>=0?`Редагувати: ${DB.portfolio[ei]?.date||''}`:'Додати знімок портфелю',formHtml(),wireForm);
+  }
+  function wireForm(){
+    const addRowBtn=document.getElementById('btn-add-row');
+    if(addRowBtn)addRowBtn.onclick=()=>{flexItems.push({lbl:'',cur:'UAH',amt:0,free:true});openSnapshotForm();};
+    function upvf(){const ur=parseFloat(document.getElementById('pru')?.value)||44.6,er=parseFloat(document.getElementById('pre')?.value)||51;
+      const uf=gn('puf'),ud=gn('pud'),uo=gn('puo'),sf=gn('psf'),si2=gn('psi'),ef=gn('pef');
+      const fixedTot=uf+ud+uo+(sf+si2)*ur+ef*er;const fixedFr=uf+sf*ur+ef*er;
+      const flexTot=flexItems.reduce((a,it)=>a+(it.cur==='UAH'?it.amt:(it.cur==='USD'?it.amt*ur:it.amt*er)),0);
+      const flexFr=flexItems.filter(i=>i.free).reduce((a,it)=>a+(it.cur==='UAH'?it.amt:(it.cur==='USD'?it.amt*ur:it.amt*er)),0);
+      const tot=fixedTot+flexTot;const fr=fixedFr+flexFr;
+      const el=document.getElementById('ppv');if(el&&tot>0)el.innerHTML=`Разом: <b>${fmt(Math.round(tot))} ${BS}</b> · Вільні: ${fmt(Math.round(fr))} ${BS} · В роботі: ${fmt(Math.round(tot-fr))} ${BS}`;}
+    document.querySelectorAll('#flex-rows .flex-row').forEach(row=>{
+      const idx=+row.dataset.idx;
+      const lblInp=row.querySelector('.fr-lbl');
+      const curSel=row.querySelector('.fr-cur');
+      const amtInp=row.querySelector('.fr-amt');
+      const freeSel=row.querySelector('.fr-free');
+      const delBtn=row.querySelector('.fr-del');
+      if(lblInp)lblInp.oninput=()=>{flexItems[idx].lbl=lblInp.value;upvf();};
+      if(curSel)curSel.onchange=()=>{flexItems[idx].cur=curSel.value;upvf();};
+      if(amtInp)amtInp.oninput=()=>{flexItems[idx].amt=+amtInp.value;upvf();};
+      if(freeSel)freeSel.onchange=()=>{flexItems[idx].free=freeSel.value==='1';upvf();};
+      if(delBtn)delBtn.onclick=()=>{flexItems.splice(idx,1);openSnapshotForm();};
+    });
+    ['pd','pru','pre','puf','pud','puo','psf','psi','pef'].forEach(id=>{const el=document.getElementById(id);if(el)el.oninput=upvf;});
+    if(ei>=0)setTimeout(upvf,50);
+    document.getElementById('bpsv').onclick=()=>{
+      const ur=parseFloat(document.getElementById('pru')?.value)||44.6,er=parseFloat(document.getElementById('pre')?.value)||51;
+      const labels={};document.querySelectorAll('.fl-edit').forEach(inp=>{labels[inp.dataset.key]=inp.value.trim()||DFL[inp.dataset.key];});
+      const snap={date:gv('pd'),type:'rich',rates:{usd:ur,eur:er},uah:{free:gn('puf'),deposit:gn('pud'),ovdp:gn('puo')},usd:{free:gn('psf'),ibkr:gn('psi')},eur:{free:gn('pef')},labels,extra:flexItems.length?JSON.parse(JSON.stringify(flexItems)):undefined};
+      if(ei>=0)DB.portfolio[ei]=snap;else DB.portfolio.push(snap);ei=-1;flexItems=[];sv();closeModal();build();};
+    document.getElementById('bpcl').onclick=()=>{ei=-1;flexItems=[];openSnapshotForm();};
+    const dp=document.getElementById('bpdl');if(dp)dp.onclick=()=>{if(confirm('Видалити?')){DB.portfolio.splice(ei,1);ei=-1;flexItems=[];sv();closeModal();build();}};
+  }
+  function build(){
+    const snaps=DB.portfolio||[];
+    let sh='';snaps.forEach((s,si)=>{const c=calcS(s);const total=Math.round(c.total);
+      const rSum=(isR(s)||s.type==='flex')?`<div class="fw"><div class="fw-f"><div style="font-size:10px;color:#201f1d;font-weight:600;letter-spacing:.04em;text-transform:uppercase">Вільні</div><div style="font-size:14px;font-weight:300;color:#201f1d">${fmt(Math.round(c.freeUah))} ${BS}</div></div><div class="fw-w"><div style="font-size:10px;color:#a06f24;font-weight:600;letter-spacing:.04em;text-transform:uppercase">В роботі</div><div style="font-size:14px;font-weight:300;color:#a06f24">${fmt(Math.round(c.inWorkUah))} ${BS}</div></div></div>`:'';
+      const rLeg='';
+      sh+=`<div class="ps ${si===ei?'ae':''}"><div class="ps-hd"><span style="font-size:12px;color:#605d5d">${s.date}</span><span style="font-size:16px;font-weight:300;color:#a06f24">${fmt(total)} ${BS}</span></div>${rSum}<div style="position:relative;height:160px;min-height:140px"><canvas id="pie${si}"></canvas></div><div style="margin-top:10px">${sBars(s)}</div>${rLeg}<div class="ps-acts"><button class="btn btng" style="font-size:11px;padding:4px 10px" id="es${si}">Редагувати</button><button class="btn btnr2" style="font-size:11px;padding:4px 10px" id="ds${si}">Видалити</button></div></div>`;});
+    setSubnav(`<span style="font-size:11px;color:#605d5d">Відображення</span><div class="toggle-btn"><button class="toggle-opt ${mode==='uah'?'on':''}" id="mu">${BS}</button><button class="toggle-opt ${mode==='native'?'on':''}" id="mn">За валютою</button></div>`);
+    document.getElementById('pb').innerHTML=`
+    <div class="g2" id="sg">${sh}</div>
+    ${snaps.length>1?`<div class="cc"><div class="ct">Загальна вартість</div><div style="position:relative;height:130px"><canvas id="cpt"></canvas></div></div>
+    <div class="cc"><div class="ct">Крок росту</div><div style="position:relative;height:130px"><canvas id="cpt-step"></canvas></div></div>`:''}`;
     setTimeout(()=>{snaps.forEach((s,si)=>{
   let d2;
   if(s.type==='flex'){const r=s.rates||{usd:44.6,eur:51};const its=s.items||[];d2={data:['UAH','USD','EUR'].map(cur=>its.filter(i=>i.cur===cur).reduce((a,i)=>a+(cur==='UAH'?i.amt:(cur==='USD'?i.amt*(r.usd||44.6):i.amt*(r.eur||51))),0)).filter((_,i,arr)=>arr[i]>0),labels:['UAH','USD','EUR'].filter((_,i,arr)=>['UAH','USD','EUR'].map(cur=>its.filter(it=>it.cur===cur).reduce((a,it2)=>a+it2.amt,0))[i]>0).map(c=>c==='UAH'?'Гривня':c==='USD'?'Долар':'Євро'),colors:['#4f6d8f','#3f7a5c','#a06f24'].filter((_,i)=>['UAH','USD','EUR'].map(cur=>its.filter(it=>it.cur===cur).reduce((a,it2)=>a+it2.amt,0))[i]>0)};}
@@ -724,7 +790,7 @@ function renderPortfolio(){
   else{d2={data:[s.uah,s.usd_uah,s.ibkr_uah,s.eur_uah],labels:PL,colors:PC};}
   const tot2=d2.data.reduce((a,b)=>a+b,0);
   mk('pie'+si,{type:'doughnut',data:{labels:d2.labels||PL,datasets:[{data:d2.data,backgroundColor:(d2.colors||PC).map(c=>c+'55'),borderColor:d2.colors||PC,borderWidth:2,hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:'52%',plugins:{datalabels:{display:ctx=>{const tot=ctx.dataset.data.reduce((a,b)=>a+b,0);return tot>0&&ctx.dataset.data[ctx.dataIndex]/tot>0.07;},color:'#201f1d',font:{size:10,weight:'500'},formatter:(val,ctx)=>{const tot=ctx.dataset.data.reduce((a,b)=>a+b,0);return Math.round(val/tot*100)+'%';}},legend:{display:false},tooltip:{backgroundColor:'#f8f4f4',borderColor:'#d7d3d3',borderWidth:1,bodyColor:'#201f1d',callbacks:{label:ctx=>` ${fmt(Math.round(ctx.raw))} ${BS} (${Math.round(ctx.raw/tot2*100)}%)`}}}}});
-  document.getElementById('es'+si).onclick=()=>{ei=si;flexItems=snaps[si].type==='flex'?JSON.parse(JSON.stringify(snaps[si].items||[])):(snaps[si].extra?JSON.parse(JSON.stringify(snaps[si].extra)):[]);build();document.getElementById('pf').scrollIntoView({behavior:'smooth',block:'start'});};
+  document.getElementById('es'+si).onclick=()=>{ei=si;flexItems=snaps[si].type==='flex'?JSON.parse(JSON.stringify(snaps[si].items||[])):(snaps[si].extra?JSON.parse(JSON.stringify(snaps[si].extra)):[]);openSnapshotForm();};
   document.getElementById('ds'+si).onclick=()=>{if(confirm('Видалити?')){DB.portfolio.splice(si,1);if(ei===si){ei=-1;flexItems=[];}sv();build();}};
 });
 if(snaps.length>1)mk('cpt',{type:'line',data:{labels:snaps.map(s=>s.date),datasets:[{label:'Портфель',data:snaps.map(s=>Math.round(calcS(s).total)),borderColor:'#a06f24',backgroundColor:'rgba(182,130,53,.08)',fill:true,borderWidth:2,pointRadius:6,tension:.35}]},options:{...CD,layout:{padding:{top:24}},plugins:{...CD.plugins,datalabels:{display:true,anchor:'end',align:'top',offset:-2,formatter:v=>(v/1000).toFixed(0)+'k',font:{size:10,weight:'500'},color:'#a06f24'}}}});
@@ -744,42 +810,10 @@ if(snaps.length>1){
 }
 },50);
     document.getElementById('mu').onclick=()=>{mode='uah';build();};document.getElementById('mn').onclick=()=>{mode='native';build();};
-    // "Додати статтю" button
-    const addRowBtn=document.getElementById('btn-add-row');
-    if(addRowBtn)addRowBtn.onclick=()=>{flexItems.push({lbl:'',cur:'UAH',amt:0,free:true});build();setTimeout(()=>{document.getElementById('pf')?.scrollIntoView({behavior:'smooth',block:'nearest'});},50);};
-    // Live preview
-    function upvf(){const ur=parseFloat(document.getElementById('pru')?.value)||44.6,er=parseFloat(document.getElementById('pre')?.value)||51;
-      const uf=gn('puf'),ud=gn('pud'),uo=gn('puo'),sf=gn('psf'),si2=gn('psi'),ef=gn('pef');
-      const fixedTot=uf+ud+uo+(sf+si2)*ur+ef*er;const fixedFr=uf+sf*ur+ef*er;
-      const flexTot=flexItems.reduce((a,it)=>a+(it.cur==='UAH'?it.amt:(it.cur==='USD'?it.amt*ur:it.amt*er)),0);
-      const flexFr=flexItems.filter(i=>i.free).reduce((a,it)=>a+(it.cur==='UAH'?it.amt:(it.cur==='USD'?it.amt*ur:it.amt*er)),0);
-      const tot=fixedTot+flexTot;const fr=fixedFr+flexFr;
-      const el=document.getElementById('ppv');if(el&&tot>0)el.innerHTML=`Разом: <b>${fmt(Math.round(tot))} ${BS}</b> · Вільні: ${fmt(Math.round(fr))} ${BS} · В роботі: ${fmt(Math.round(tot-fr))} ${BS}`;}
-    // Wire each flex-row's inputs to flexItems array (closure-based, not inline strings)
-    document.querySelectorAll('#flex-rows .flex-row').forEach(row=>{
-      const idx=+row.dataset.idx;
-      const lblInp=row.querySelector('.fr-lbl');
-      const curSel=row.querySelector('.fr-cur');
-      const amtInp=row.querySelector('.fr-amt');
-      const freeSel=row.querySelector('.fr-free');
-      const delBtn=row.querySelector('.fr-del');
-      if(lblInp)lblInp.oninput=()=>{flexItems[idx].lbl=lblInp.value;upvf();};
-      if(curSel)curSel.onchange=()=>{flexItems[idx].cur=curSel.value;upvf();};
-      if(amtInp)amtInp.oninput=()=>{flexItems[idx].amt=+amtInp.value;upvf();};
-      if(freeSel)freeSel.onchange=()=>{flexItems[idx].free=freeSel.value==='1';upvf();};
-      if(delBtn)delBtn.onclick=()=>{flexItems.splice(idx,1);build();};
-    });
-    ['pd','pru','pre','puf','pud','puo','psf','psi','pef'].forEach(id=>{const el=document.getElementById(id);if(el)el.oninput=upvf;});
-    if(ei>=0)setTimeout(upvf,50);
-    document.getElementById('bpsv').onclick=()=>{
-      const ur=parseFloat(document.getElementById('pru')?.value)||44.6,er=parseFloat(document.getElementById('pre')?.value)||51;
-      const labels={};document.querySelectorAll('.fl-edit').forEach(inp=>{labels[inp.dataset.key]=inp.value.trim()||DFL[inp.dataset.key];});
-      const snap={date:gv('pd'),type:'rich',rates:{usd:ur,eur:er},uah:{free:gn('puf'),deposit:gn('pud'),ovdp:gn('puo')},usd:{free:gn('psf'),ibkr:gn('psi')},eur:{free:gn('pef')},labels,extra:flexItems.length?JSON.parse(JSON.stringify(flexItems)):undefined};
-      if(ei>=0)DB.portfolio[ei]=snap;else DB.portfolio.push(snap);ei=-1;flexItems=[];sv();build();};
-    document.getElementById('bpcl').onclick=()=>{ei=-1;flexItems=[];build();};
-    const dp=document.getElementById('bpdl');if(dp)dp.onclick=()=>{if(confirm('Видалити?')){DB.portfolio.splice(ei,1);ei=-1;flexItems=[];sv();build();}};
   }
-  document.getElementById('content').innerHTML=`<div class="st">Портфель</div><div id="pb"></div>`;build();
+  document.getElementById('content').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div class="st" style="margin:0;padding:0;border:0">Портфель</div><button class="btn btnp" id="btn-add-snapshot" style="font-size:12px;padding:6px 14px">+ Додати знімок портфелю</button></div><div id="pb"></div>`;
+  document.getElementById('btn-add-snapshot').onclick=()=>{ei=-1;flexItems=[];openSnapshotForm();};
+  build();
 }
 
 // ── INVESTMENTS ──────────────────────────────────────────────
@@ -833,6 +867,120 @@ function renderInvest(){
   let invMode='base'; // 'base' = convert all to base currency, 'native' = group by native currency
   let showArchived=false;
   let startRateFetchDone=false; // guards the one-shot NBU historical-rate fetch for "Стартова сума" below
+
+  // "Додати запис" lives in the modal — recFormHtml() re-reads DB.investments fresh each call
+  // (cheap, and avoids depending on build()'s local `all`), wireRecForm() attaches handlers.
+  function recFormHtml(){
+    const all=DB.investments||[];
+    return`<div class="fg" style="grid-template-columns:1fr 1.4fr 1fr 1fr">
+      <div><label>Дата</label><input type="date" id="rf-date" value="${eri>=0?monthStrToISO(all[eri].date):todayISO()}" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+      <div><label>Опис</label><input id="rf-desc" list="desc-datalist" value="${eri>=0?all[eri].desc:''}" placeholder="ОВДП, VT, US-T, Депозит…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
+        <datalist id="desc-datalist">${(DB.investDescs||[]).map(d=>`<option value="${d}">`).join('')}</datalist>
+      </div>
+      <div><label>Тип</label><select id="rf-type" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
+        ${Object.entries(RT).map(([k,v])=>`<option value="${k}" ${eri>=0&&(all[eri].type||'contribution')===k?'selected':''}>${v.lbl}</option>`).join('')}
+      </select></div>
+      <div><label>Валюта</label><select id="rf-cur" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
+        ${getCurs().map(c=>`<option value="${c.code}" ${(eri>=0?all[eri].currency:getBase())===c.code?'selected':''}>${c.symbol} ${c.code}</option>`).join('')}
+      </select></div>
+    </div>
+    <div id="rf-reinv-wrap" style="display:none;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#605d5d;cursor:pointer">
+        <input type="checkbox" id="rf-reinv" ${eri>=0&&all[eri].reinvested===false?'':'checked'}>
+        Реінвестовано (додається до поточного балансу)
+      </label>
+      <div style="font-size:10px;color:#605d5d;margin-top:2px;margin-left:22px">Якщо зняти — сума рахується в прибуток, але не в баланс (гроші пішли деінде/готівкою)</div>
+    </div>
+    <div class="fg" style="grid-template-columns:1fr 1fr">
+      <div><label>Режим</label><select id="rf-mode" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
+        <option value="nav" ${eri>=0&&(all[eri].mode||'delta')==='nav'?'selected':''}>Сума (новий баланс)</option>
+        <option value="delta" ${eri<0||(all[eri].mode||'delta')==='delta'?'selected':''}>Зміна ± (сума події)</option>
+      </select></div>
+      <div><label id="rf-lbl">${eri>=0&&all[eri].mode==='nav'?'Новий баланс':'Сума'}</label><input id="rf-val" type="number" step="0.01" value="${eri>=0?(all[eri].enteredVal!==undefined?all[eri].enteredVal:Math.abs(all[eri].amount)):''}" placeholder="0.00" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+    </div>
+    <div class="fg" style="grid-template-columns:1fr">
+      <div><label>Примітка <span style="color:#7d7979;font-weight:400;text-transform:none">(де фізично лежить — ICU, Privat, IBKR…)</span></label><input id="rf-note" value="${eri>=0?(all[eri].note||''):''}" placeholder="напр. ICU, Privat, IBKR" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
+    </div>
+    <div style="margin-bottom:8px"><label style="font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:500;letter-spacing:.06em;display:block;margin-bottom:4px">Поточний баланс за цим описом (до цього запису)</label><div style="padding:6px 0;font-size:13px;color:#605d5d" id="rf-curbal">—</div></div>
+    <div class="btnr-wrap"><button class="btn btnp" id="rf-save">Зберегти</button><button class="btn btng" id="rf-cancel">${eri>=0?'Скасувати':'Очистити'}</button>${eri>=0?`<button class="btn btnr2" id="rf-del">Видалити</button>`:''}</div>`;
+  }
+  function openRecForm(){
+    openModal(eri>=0?'Редагувати запис':'Додати запис',recFormHtml(),wireRecForm);
+  }
+  function wireRecForm(){
+    const all=DB.investments||[];
+    function updRfCurBal(){
+      const desc=document.getElementById('rf-desc')?.value||'';
+      const editDate=document.getElementById('rf-date')?.value||'';
+      const recs=recsForDesc(desc).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+      const editingThis=eri>=0&&all[eri]&&all[eri].desc===desc;
+      let b=0;
+      recs.forEach(r=>{
+        if(editingThis&&r===all[eri])return; // skip the record being edited itself
+        if(editDate&&(r.date||'')>=editDate)return; // only count records strictly BEFORE this date
+        if(r.type==='dividends'&&r.reinvested===false)return; // non-reinvested doesn't affect balance
+        b+=r.amount||0;
+      });
+      const cur=getCur(document.getElementById('rf-cur')?.value||'UAH');
+      const el=document.getElementById('rf-curbal');if(el)el.textContent=fmt(b)+' '+cur.symbol;
+      const mode=document.getElementById('rf-mode')?.value||'nav';
+      const lb=document.getElementById('rf-lbl');
+      if(lb)lb.textContent=mode==='delta'?'Зміна (сума події)':'Новий баланс';
+    }
+    ['rf-desc','rf-mode','rf-cur','rf-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',updRfCurBal);});
+    updRfCurBal();
+    // Show "Реінвестовано" checkbox only for dividends type
+    function updRfReinvVis(){
+      const t=document.getElementById('rf-type')?.value;
+      const w=document.getElementById('rf-reinv-wrap');
+      if(w)w.style.display=t==='dividends'?'block':'none';
+    }
+    const rfTypeSel=document.getElementById('rf-type');
+    if(rfTypeSel)rfTypeSel.addEventListener('change',updRfReinvVis);
+    updRfReinvVis();
+    // Explicit state tracking for the reinvested checkbox (defensive — avoids any DOM-read edge case)
+    let reinvState=eri>=0?(all[eri].reinvested!==false):true;
+    const rfReinvChk=document.getElementById('rf-reinv');
+    if(rfReinvChk){
+      rfReinvChk.checked=reinvState;
+      rfReinvChk.onchange=()=>{reinvState=rfReinvChk.checked;};
+      rfReinvChk.onclick=()=>{reinvState=rfReinvChk.checked;};
+    }
+    document.getElementById('rf-cancel').onclick=()=>{
+      if(eri>=0){eri=-1;closeModal();build();} // "Скасувати" — abandon the edit
+      else openRecForm(); // "Очистити" — just reset the blank add-form, stay open
+    };
+    const rfDel=document.getElementById('rf-del');
+    if(rfDel)rfDel.onclick=()=>{if(confirm('Видалити запис?')){DB.investments.splice(eri,1);eri=-1;sv();closeModal();build();}};
+    document.getElementById('rf-save').onclick=()=>{
+      const date=document.getElementById('rf-date').value;
+      const desc=document.getElementById('rf-desc').value.trim();
+      const type=document.getElementById('rf-type').value;
+      const currency=document.getElementById('rf-cur').value;
+      const mode=document.getElementById('rf-mode').value;
+      const enteredVal=parseFloat(document.getElementById('rf-val').value)||0;
+      if(!date||!desc){alert('Вкажіть дату і опис');return;}
+      const recs=recsForDesc(desc).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+      const editingThis=eri>=0&&all[eri]&&all[eri].desc===desc;
+      let curBal=0;
+      recs.forEach(r=>{
+        if(editingThis&&r===all[eri])return;
+        if(date&&(r.date||'')>=date)return;
+        if(r.type==='dividends'&&r.reinvested===false)return;
+        curBal+=r.amount||0;
+      });
+      let amount;
+      if(mode==='delta'){amount=type==='withdrawal'?-Math.abs(enteredVal):enteredVal;}
+      else{amount=enteredVal-curBal;}
+      const reinvested=type==='dividends'?reinvState:undefined;
+      rememberDesc(desc);
+      const note=document.getElementById('rf-note')?.value.trim()||'';
+      const rec={date,desc,currency,type,amount,note,mode,enteredVal,...(reinvested!==undefined?{reinvested}:{})};
+      if(eri>=0)DB.investments[eri]=rec;else DB.investments.push(rec);
+      DB.investments.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+      eri=-1;sv();closeModal();build();
+    };
+  }
 
   function build(){
     const all=DB.investments||[];
@@ -980,6 +1128,7 @@ function renderInvest(){
       <div class="chart-scroll"><div style="position:relative;height:200px;min-width:${Math.max(420,filtered.length*55)}px"><canvas id="civchart"></canvas></div></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn btnp" id="btn-add-record" style="font-size:11px;padding:6px 12px">+ Додати запис</button>
       <button class="cbtn" id="btn-toggle-recs" style="margin-bottom:0">▼ Записи <span style="font-size:10px;color:#605d5d">(${filtered.length})</span></button>
       <button class="btn btng" id="btn-open-import" style="font-size:11px;padding:6px 12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Імпорт з Excel</button>
       <button class="btn btng" id="btn-open-transfer" style="font-size:11px;padding:6px 12px">↔ Переказ</button>
@@ -1039,38 +1188,6 @@ function renderInvest(){
         }).join('');
       })()}
     </tbody></table></div></div>
-    <div class="fc ${eri>=0?'editing':''}" id="inv-form"><div class="ct">${eri>=0?`Редагувати запис`:'Додати запис'}</div>
-    <div class="fg" style="grid-template-columns:1fr 1.4fr 1fr 1fr">
-      <div><label>Дата</label><input type="date" id="rf-date" value="${eri>=0?monthStrToISO(all[eri].date):todayISO()}" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
-      <div><label>Опис</label><input id="rf-desc" list="desc-datalist" value="${eri>=0?all[eri].desc:''}" placeholder="ОВДП, VT, US-T, Депозит…" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
-        <datalist id="desc-datalist">${(DB.investDescs||[]).map(d=>`<option value="${d}">`).join('')}</datalist>
-      </div>
-      <div><label>Тип</label><select id="rf-type" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
-        ${Object.entries(RT).map(([k,v])=>`<option value="${k}" ${eri>=0&&(all[eri].type||'contribution')===k?'selected':''}>${v.lbl}</option>`).join('')}
-      </select></div>
-      <div><label>Валюта</label><select id="rf-cur" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
-        ${getCurs().map(c=>`<option value="${c.code}" ${(eri>=0?all[eri].currency:getBase())===c.code?'selected':''}>${c.symbol} ${c.code}</option>`).join('')}
-      </select></div>
-    </div>
-    <div id="rf-reinv-wrap" style="display:none;margin-bottom:8px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#605d5d;cursor:pointer">
-        <input type="checkbox" id="rf-reinv" ${eri>=0&&all[eri].reinvested===false?'':'checked'}>
-        Реінвестовано (додається до поточного балансу)
-      </label>
-      <div style="font-size:10px;color:#605d5d;margin-top:2px;margin-left:22px">Якщо зняти — сума рахується в прибуток, але не в баланс (гроші пішли деінде/готівкою)</div>
-    </div>
-    <div class="fg" style="grid-template-columns:1fr 1fr">
-      <div><label>Режим</label><select id="rf-mode" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%">
-        <option value="nav" ${eri>=0&&(all[eri].mode||'delta')==='nav'?'selected':''}>Сума (новий баланс)</option>
-        <option value="delta" ${eri<0||(all[eri].mode||'delta')==='delta'?'selected':''}>Зміна ± (сума події)</option>
-      </select></div>
-      <div><label id="rf-lbl">${eri>=0&&all[eri].mode==='nav'?'Новий баланс':'Сума'}</label><input id="rf-val" type="number" step="0.01" value="${eri>=0?(all[eri].enteredVal!==undefined?all[eri].enteredVal:Math.abs(all[eri].amount)):''}" placeholder="0.00" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
-    </div>
-    <div class="fg" style="grid-template-columns:1fr">
-      <div><label>Примітка <span style="color:#7d7979;font-weight:400;text-transform:none">(де фізично лежить — ICU, Privat, IBKR…)</span></label><input id="rf-note" value="${eri>=0?(all[eri].note||''):''}" placeholder="напр. ICU, Privat, IBKR" style="background:#f3f2f2;border:1px solid #d7d3d3;border-radius:6px;padding:6px 9px;font-size:12px;width:100%"></div>
-    </div>
-    <div style="margin-bottom:8px"><label style="font-size:10px;color:#605d5d;text-transform:uppercase;font-weight:500;letter-spacing:.06em;display:block;margin-bottom:4px">Поточний баланс за цим описом (до цього запису)</label><div style="padding:6px 0;font-size:13px;color:#605d5d" id="rf-curbal">—</div></div>
-    <div class="btnr-wrap"><button class="btn btnp" id="rf-save">Зберегти</button><button class="btn btng" id="rf-cancel">${eri>=0?'Скасувати':'Очистити'}</button>${eri>=0?`<button class="btn btnr2" id="rf-del">Видалити</button>`:''}</div></div>
     <div class="div"></div>
     <div class="st">Річний підсумок (податки)</div>
     <div style="font-size:11px;color:#7d7979;margin-bottom:8px">Дивіденди/купони підтягуються автоматично з усіх записів. Тут можна додати іншу позицію (напр. % банку) і податок за рік.</div>
@@ -1115,6 +1232,8 @@ function renderInvest(){
     if(chkArch)chkArch.onchange=()=>{showArchived=chkArch.checked;build();};
     document.getElementById('inv-mode-base').onclick=()=>{invMode='base';build();};
     document.getElementById('inv-mode-native').onclick=()=>{invMode='native';build();};
+
+    document.getElementById('btn-add-record').onclick=()=>{eri=-1;openRecForm();};
 
     // ── records collapse + edit/delete ──
     const toggleBtn=document.getElementById('btn-toggle-recs');
@@ -1262,7 +1381,7 @@ function renderInvest(){
     filtered.forEach(r=>{
       const gi=all.indexOf(r);
       const eb=document.getElementById('rec-e-'+gi);const db2=document.getElementById('rec-d-'+gi);
-      if(eb)eb.onclick=()=>{eri=gi;build();document.getElementById('inv-form')?.scrollIntoView({behavior:'smooth',block:'start'});};
+      if(eb)eb.onclick=()=>{eri=gi;openRecForm();};
       if(db2)db2.onclick=()=>{
         const rec=all[gi];
         const isTransfer=!!rec.transferId;
@@ -1304,75 +1423,6 @@ function renderInvest(){
       eri=-1;sv();build();
     };
 
-    // ── add/edit form ──
-    function updRfCurBal(){
-      const desc=document.getElementById('rf-desc')?.value||'';
-      const editDate=document.getElementById('rf-date')?.value||'';
-      const recs=recsForDesc(desc).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-      const editingThis=eri>=0&&all[eri]&&all[eri].desc===desc;
-      let b=0;
-      recs.forEach(r=>{
-        if(editingThis&&r===all[eri])return; // skip the record being edited itself
-        if(editDate&&(r.date||'')>=editDate)return; // only count records strictly BEFORE this date
-        if(r.type==='dividends'&&r.reinvested===false)return; // non-reinvested doesn't affect balance
-        b+=r.amount||0;
-      });
-      const cur=getCur(document.getElementById('rf-cur')?.value||'UAH');
-      const el=document.getElementById('rf-curbal');if(el)el.textContent=fmt(b)+' '+cur.symbol;
-      const mode=document.getElementById('rf-mode')?.value||'nav';
-      const lb=document.getElementById('rf-lbl');
-      if(lb)lb.textContent=mode==='delta'?'Зміна (сума події)':'Новий баланс';
-    }
-    ['rf-desc','rf-mode','rf-cur','rf-date'].forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',updRfCurBal);});
-    updRfCurBal();
-    // Show "Реінвестовано" checkbox only for dividends type
-    function updRfReinvVis(){
-      const t=document.getElementById('rf-type')?.value;
-      const w=document.getElementById('rf-reinv-wrap');
-      if(w)w.style.display=t==='dividends'?'block':'none';
-    }
-    const rfTypeSel=document.getElementById('rf-type');
-    if(rfTypeSel)rfTypeSel.addEventListener('change',updRfReinvVis);
-    updRfReinvVis();
-    // Explicit state tracking for the reinvested checkbox (defensive — avoids any DOM-read edge case)
-    let reinvState=eri>=0?(all[eri].reinvested!==false):true;
-    const rfReinvChk=document.getElementById('rf-reinv');
-    if(rfReinvChk){
-      rfReinvChk.checked=reinvState;
-      rfReinvChk.onchange=()=>{reinvState=rfReinvChk.checked;};
-      rfReinvChk.onclick=()=>{reinvState=rfReinvChk.checked;};
-    }
-    document.getElementById('rf-cancel').onclick=()=>{eri=-1;build();};
-    const rfDel=document.getElementById('rf-del');
-    if(rfDel)rfDel.onclick=()=>{if(confirm('Видалити запис?')){DB.investments.splice(eri,1);eri=-1;sv();build();}};
-    document.getElementById('rf-save').onclick=()=>{
-      const date=document.getElementById('rf-date').value;
-      const desc=document.getElementById('rf-desc').value.trim();
-      const type=document.getElementById('rf-type').value;
-      const currency=document.getElementById('rf-cur').value;
-      const mode=document.getElementById('rf-mode').value;
-      const enteredVal=parseFloat(document.getElementById('rf-val').value)||0;
-      if(!date||!desc){alert('Вкажіть дату і опис');return;}
-      const recs=recsForDesc(desc).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-      const editingThis=eri>=0&&all[eri]&&all[eri].desc===desc;
-      let curBal=0;
-      recs.forEach(r=>{
-        if(editingThis&&r===all[eri])return;
-        if(date&&(r.date||'')>=date)return;
-        if(r.type==='dividends'&&r.reinvested===false)return;
-        curBal+=r.amount||0;
-      });
-      let amount;
-      if(mode==='delta'){amount=type==='withdrawal'?-Math.abs(enteredVal):enteredVal;}
-      else{amount=enteredVal-curBal;}
-      const reinvested=type==='dividends'?reinvState:undefined;
-      rememberDesc(desc);
-      const note=document.getElementById('rf-note')?.value.trim()||'';
-      const rec={date,desc,currency,type,amount,note,mode,enteredVal,...(reinvested!==undefined?{reinvested}:{})};
-      if(eri>=0)DB.investments[eri]=rec;else DB.investments.push(rec);
-      DB.investments.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-      eri=-1;sv();build();
-    };
 
     // ── yearly tax summary: auto dividends BY CATEGORY from records + manual extras ──
     const icEl=document.getElementById('ic');
@@ -1402,11 +1452,14 @@ function renderInvest(){
     });
     icEl.innerHTML=yearRows.map(d=>{
       const descBreakdown=Object.entries(d.byDesc).map(([desc,v])=>`${desc} ${fmt(v)}`).join(' · ');
-      return`<div class="inv-card ${d.year===ey?'ae':''}"><div class="cl">${d.year}</div><div class="cv gold">${fmt(d.net)} ${BS} <span style="font-size:11px;color:#7d7979">нетто</span></div><div class="cs" style="margin-top:4px">${descBreakdown}${d.other?' · Інше '+fmt(d.other):''}${d.tax?' · Пдт −'+fmt(d.tax):''}</div><div class="inv-acts"><button class="btn btng" style="font-size:11px;padding:4px 10px" id="ei${d.year}">✎</button>${d.other||d.tax?`<button class="btn btnr2" style="font-size:11px;padding:4px 10px" id="di${d.year}">×</button>`:''}</div></div>`;
+      return`<div class="inv-card ${d.year===ey?'ae':''}" data-year="${d.year}" style="cursor:pointer"><div class="cl">${d.year}</div><div class="cv gold">${fmt(d.net)} ${BS} <span style="font-size:11px;color:#7d7979">нетто</span></div><div id="icd${d.year}" style="display:none"><div class="cs" style="margin-top:4px">${descBreakdown}${d.other?' · Інше '+fmt(d.other):''}${d.tax?' · Пдт −'+fmt(d.tax):''}</div><div class="inv-acts"><button class="btn btng" style="font-size:11px;padding:4px 10px" id="ei${d.year}">✎</button>${d.other||d.tax?`<button class="btn btnr2" style="font-size:11px;padding:4px 10px" id="di${d.year}">×</button>`:''}</div></div></div>`;
     }).join('');
     yearRows.forEach(d=>{
-      const eb=document.getElementById('ei'+d.year);if(eb)eb.onclick=()=>{ey=d.year;build();document.getElementById('ivf').scrollIntoView({behavior:'smooth',block:'start'});};
-      const db3=document.getElementById('di'+d.year);if(db3)db3.onclick=()=>{if(confirm('Видалити ручні дані за '+d.year+'?')){DB.investManual=DB.investManual.filter(x=>x.year!==d.year);if(ey===d.year)ey=-1;sv();build();}};
+      const card=icEl.querySelector(`.inv-card[data-year="${d.year}"]`);
+      const detail=document.getElementById('icd'+d.year);
+      if(card&&detail)card.onclick=e=>{if(e.target.closest('button'))return;detail.style.display=detail.style.display==='none'?'block':'none';};
+      const eb=document.getElementById('ei'+d.year);if(eb)eb.onclick=e=>{e.stopPropagation();ey=d.year;build();document.getElementById('ivf').scrollIntoView({behavior:'smooth',block:'start'});};
+      const db3=document.getElementById('di'+d.year);if(db3)db3.onclick=e=>{e.stopPropagation();if(confirm('Видалити ручні дані за '+d.year+'?')){DB.investManual=DB.investManual.filter(x=>x.year!==d.year);if(ey===d.year)ey=-1;sv();build();}};
     });
     // Currency mode toggle
     const yrModeBaseBtn=document.getElementById('yr-mode-base');
