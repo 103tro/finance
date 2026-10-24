@@ -77,6 +77,7 @@ nav{display:flex;justify-content:center;border-bottom:1px solid var(--div)}
 .ic:hover{color:var(--acc-700)}
 .yr-mini{background:transparent;border:1px solid var(--div);border-radius:4px;padding:12px}
 .yr-mini-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.inv-cards{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
 .inv-card{background:transparent;border:1px solid var(--div);border-radius:4px;padding:14px}
 .inv-card.ae{border-color:var(--acc);background:#f8f4f4}
 .inv-acts{display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--div)}
@@ -780,7 +781,7 @@ function renderPortfolio(){
       sh+=`<div class="ps ${si===ei?'ae':''}"><div class="ps-hd"><span style="font-size:12px;color:#605d5d">${s.date}</span><span style="font-size:16px;font-weight:300;color:#a06f24">${fmt(total)} ${BS}</span></div>${rSum}<div style="position:relative;height:160px;min-height:140px"><canvas id="pie${si}"></canvas></div><div style="margin-top:10px">${sBars(s)}</div>${rLeg}<div class="ps-acts"><button class="btn btng" style="font-size:11px;padding:4px 10px" id="es${si}">Редагувати</button><button class="btn btnr2" style="font-size:11px;padding:4px 10px" id="ds${si}">Видалити</button></div></div>`;});
     setSubnav(`<span style="font-size:11px;color:#605d5d">Відображення</span><div class="toggle-btn"><button class="toggle-opt ${mode==='uah'?'on':''}" id="mu">${BS}</button><button class="toggle-opt ${mode==='native'?'on':''}" id="mn">За валютою</button></div>`);
     document.getElementById('pb').innerHTML=`
-    <div class="g2" id="sg">${sh}</div>
+    <div class="g2" id="sg" style="margin-bottom:16px">${sh}</div>
     ${snaps.length>1?`<div class="cc"><div class="ct">Загальна вартість</div><div style="position:relative;height:130px"><canvas id="cpt"></canvas></div></div>
     <div class="cc"><div class="ct">Крок росту</div><div style="position:relative;height:130px"><canvas id="cpt-step"></canvas></div></div>`:''}`;
     setTimeout(()=>{snaps.forEach((s,si)=>{
@@ -1251,7 +1252,9 @@ function renderInvest(){
     const firstRecElapsed=firstRec?elapsedYM(firstRec.date):'';
     const startBoxHtml=firstRec?`<div class="card"><div class="cl">Стартова сума</div><div style="font-size:15px;font-weight:300">${fmt(Math.abs(firstRec.amount))} ${getCur(firstRec.currency||'UAH').symbol}</div>${startUahVal!=null?`<div class="cs">≈ ${fmt(Math.round(startUahVal))} ₴</div>`:startUahLoading?`<div class="cs">курс завантажується…</div>`:''}<div class="cs" style="margin-top:2px">${firstRecDateStr} · ${firstRec.desc}${firstRecElapsed?' · '+firstRecElapsed:''}</div></div>`:'';
     const balanceBoxHtml=`<div class="card"><div class="cl">Поточний баланс</div><div class="cv gold">${lastDisp}</div></div>`;
-    const row1Html=firstRec?`<div class="bigrow" style="grid-template-columns:1fr 1.8fr">${startBoxHtml}${balanceBoxHtml}</div>`:`<div class="bigrow" style="grid-template-columns:1fr">${balanceBoxHtml}</div>`;
+    // 1.6fr/2fr matches bigBoxRow's "1.6fr repeat(2,1fr)" below, so the divider here lines up
+    // with the one between the big box and its satellites in the rows underneath.
+    const row1Html=firstRec?`<div class="bigrow" style="grid-template-columns:1.6fr 2fr">${startBoxHtml}${balanceBoxHtml}</div>`:`<div class="bigrow" style="grid-template-columns:1fr">${balanceBoxHtml}</div>`;
 
     const vkladenoSats=[];
     if(setCalc.contGross)vkladenoSats.push({cl:'Зовні',cv:contGrossDisp});
@@ -1329,7 +1332,6 @@ function renderInvest(){
         }).join('');
       })()}
     </tbody></table></div></div>
-    <div class="div"></div>
     <div class="st">Річний підсумок (податки)</div>
     <div style="font-size:11px;color:#7d7979;margin-bottom:8px">Дивіденди/купони підтягуються автоматично з усіх записів. Тут можна додати іншу позицію (напр. % банку) і податок за рік.</div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><div class="toggle-btn"><button class="toggle-opt ${yrMode==='base'?'on':''}" id="yr-mode-base">${BS}</button><button class="toggle-opt ${yrMode==='native'?'on':''}" id="yr-mode-native">За валютою</button></div></div>
